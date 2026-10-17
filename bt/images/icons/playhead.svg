@@ -1,0 +1,7 @@
+<svg viewBox="0 0 10 9" xmlns="http://www.w3.org/2000/svg">
+  <!-- Timeline playhead, tip up at the track. White: the timeline tints it
+       with its playhead color (bt/timeline/timeline.css) and rotates it
+       for the vertical timeline. -->
+  <!-- Arrowhead: the base notched in to an inner angle. -->
+  <path fill="#fff" d="M5 0L10 9L5 6.3L0 9z"/>
+</svg>

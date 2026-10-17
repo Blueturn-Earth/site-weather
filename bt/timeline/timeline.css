@@ -1,0 +1,564 @@
+.epic-timeline {
+  /* Playhead (canvas, timeline_view.js): triangle, and the padlock icon while
+     time is locked (white SVG, tinted with this color). */
+  --timeline-playhead-color: #e02020;
+  --timeline-playhead-locked-color: #b05050;
+  position: fixed;
+  z-index: 18;
+  pointer-events: auto;
+  opacity: 1;
+  overflow: visible;
+  touch-action: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  zoom: var(--bt-ui-scale, 1);
+}
+
+.epic-timeline-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  overflow: visible;
+  /* Hits go to the strip container so overflowing 45° names don't steal globe clicks. */
+  pointer-events: none;
+}
+
+/* Portrait: full-bleed strip — left edge to right edge (infinite rail). */
+.epic-timeline--horizontal {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--timeline-height, 66px);
+}
+
+/* Landscape: full-bleed strip — top edge to bottom edge (infinite rail). */
+.epic-timeline--vertical {
+  top: 0;
+  bottom: 0;
+  width: var(--timeline-width, 172px);
+}
+
+.epic-timeline--vertical.epic-timeline--side-left {
+  left: 0;
+  right: auto;
+}
+
+.epic-timeline--vertical.epic-timeline--side-right {
+  left: auto;
+  right: 0;
+}
+
+/* Only the track, its labels and the add-on's reach react (host.js:
+   --timeline-hit-width); the rest of the strip is drawing room, left to the
+   globe. Its events still reach this element (the zone is its ::before). */
+.epic-timeline--vertical {
+  pointer-events: none;
+}
+
+.epic-timeline--vertical::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--timeline-hit-width, 100%);
+  pointer-events: auto;
+}
+
+.epic-timeline--vertical.epic-timeline--side-left::before {
+  left: 0;
+}
+
+.epic-timeline--vertical.epic-timeline--side-right::before {
+  right: 0;
+}
+
+/* Timeline chrome — controls sit outside the drawn strip. */
+.epic-timeline--pending .epic-timeline-canvas {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.epic-timeline--pending.epic-timeline--horizontal {
+  height: var(--timeline-height, 66px);
+}
+
+.epic-timeline--pending.epic-timeline--vertical {
+  width: var(--timeline-width, 172px);
+}
+
+.timeline-analemma-caption {
+  margin-top: 2px;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.epic-timeline--vertical .timeline-analemma-caption {
+  font-size: 10px;
+  line-height: 1.15;
+}
+
+.timeline-chrome {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.timeline-chrome[hidden] {
+  display: none !important;
+}
+
+/* Horizontal: chrome band entirely above the strip. */
+.epic-timeline--horizontal .timeline-chrome {
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  top: auto;
+  height: auto;
+  min-height: 0;
+  padding-bottom: 4px;
+}
+
+.epic-timeline--horizontal .timeline-chrome-inner {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: auto;
+}
+
+/* Vertical: chrome spans the strip; bottom stack hangs on the interior side. */
+.epic-timeline--vertical .timeline-chrome {
+  inset: 0;
+  width: auto;
+  height: auto;
+  overflow: visible;
+}
+
+.timeline-chrome-inner {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/*
+ * Bottom stack: one controls row. Play in the corner opposite the menu, speed
+ * next to it on the interior side, Latest centered, date on the menu side.
+ * Loading sits on the play button (see .play-stack).
+ */
+.timeline-chrome-bottom-stack {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.timeline-chrome-bottom-stack > * {
+  pointer-events: auto;
+}
+
+/* Play is in the corner: anchor Loading to that screen edge, not centered. */
+.play-stack #loading-text {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  text-align: center;
+  white-space: nowrap;
+  max-width: min(70vw, 420px);
+}
+
+
+.timeline-chrome-controls-row {
+  order: 1;
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.timeline-chrome-transport {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: calc(50% - 30px);
+}
+
+.timeline-chrome-transport > .timeline-chrome-play-row {
+  order: 0;
+}
+
+.timeline-chrome-transport > .timeline-chrome-speed-wrap {
+  order: 1;
+}
+
+/* Latest: centered in the controls row. */
+.timeline-chrome-latest {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Wide flex rows: only their controls are hittable, not the empty span. */
+.timeline-chrome-controls-row {
+  pointer-events: none;
+}
+
+.timeline-chrome-controls-row > * {
+  pointer-events: auto;
+}
+
+.timeline-chrome-date-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  /* Takes the room beside the play button (at most half the row less the button's half and a gap), and is the
+     container the date's font size follows (`100cqw`, style.css): the text shrinks to fit, then wraps. */
+  flex: 1 1 0;
+  container-type: inline-size;
+  max-width: calc(50% - 30px);
+  min-width: 0;
+  overflow: visible;
+  text-align: right;
+  /* The flex box spans far left of the visible date: only its text is hittable
+     (whatever lies under the empty part, e.g. a split pane, stays clickable). */
+  pointer-events: none;
+}
+
+.timeline-chrome-controls-row > .timeline-chrome-date-wrap {
+  pointer-events: none;
+}
+
+.timeline-chrome-date-wrap > * {
+  pointer-events: auto;
+}
+
+.timeline-chrome-date-wrap #current-time-text {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: flex-end;
+  column-gap: 0.35em;
+  row-gap: 0.1em;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: break-word;
+  text-align: right;
+  width: auto;
+  max-width: 100%;
+  align-self: auto;
+}
+
+.timeline-chrome-date-wrap #current-time-text .time-bar-place,
+.timeline-chrome-date-wrap #current-time-text .time-bar-day,
+.timeline-chrome-date-wrap #current-time-text .time-bar-tod {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.timeline-chrome-date-wrap .timeline-analemma-caption {
+  order: 1;
+  max-width: 100%;
+}
+
+/* Portrait: single row just above the strip; date on the menu side. */
+.epic-timeline--horizontal .timeline-chrome-bottom-stack {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  max-width: none;
+  width: 100%;
+  box-sizing: border-box;
+  /* Clear of the add-on marks / thumbs above the track. */
+  padding: 0 8px 10px;
+}
+
+/* Portrait: the strip's hit zone reaches up to about the top of the play / date
+   row (a fixed height, not tied to those controls). The extension is part of
+   the strip (a drag scrubs, a tap acts as a tap on the strip); the controls
+   sit above it (.timeline-chrome, z-index 2) and keep their own clicks.
+   58px is the reach with add-on thumbs; without them the row sits lower by
+   34px minus the reach (see the translateY below). */
+.epic-timeline--horizontal::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: calc(58px - max(0px, 34px - var(--timeline-addon-reach, 0px)) + var(--timeline-addon-hit-extra, 0px));
+  pointer-events: auto;
+}
+
+/* No add-on thumbs above the track (--timeline-addon-reach unset, e.g.
+   extensions off): the strip's empty top is free, so the play / date row
+   comes down closer to the line. With a reach the shift is 0. An add-on whose
+   tilted labels rise past its marks lifts the row clear of them
+   (--timeline-label-lift, 0 when none). */
+.epic-timeline--horizontal .timeline-chrome-bottom-stack {
+  transform: translateY(calc(max(0px, 34px - var(--timeline-addon-reach, 0px)) - var(--timeline-label-lift, 0px)));
+}
+
+.epic-timeline--horizontal.epic-timeline--side-right .timeline-chrome-controls-row,
+.epic-timeline--horizontal.epic-timeline--side-right .timeline-chrome-transport {
+  flex-direction: row-reverse;
+}
+
+/* Date on the first line, time on the second (portrait and landscape);
+   the imagery credit on its own line above both. */
+.timeline-chrome-date-wrap #current-time-text .time-bar-tod,
+.timeline-chrome-date-wrap #current-time-text .time-bar-status {
+  flex-basis: 100%;
+  text-align: right;
+}
+
+/* Menu on the left → date on the left. */
+.epic-timeline--side-right .timeline-chrome-date-wrap {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.epic-timeline--side-right .timeline-chrome-date-wrap #current-time-text {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.epic-timeline--side-right .timeline-chrome-date-wrap #current-time-text .time-bar-tod,
+.epic-timeline--side-right .timeline-chrome-date-wrap #current-time-text .time-bar-status {
+  text-align: left;
+}
+
+/* Landscape: span from timeline interior to the far screen edge. */
+.epic-timeline--vertical .timeline-chrome-bottom-stack {
+  position: fixed;
+  bottom: 8px;
+  top: auto;
+  max-width: none;
+  width: auto;
+}
+
+.epic-timeline--vertical.epic-timeline--side-left .timeline-chrome-bottom-stack {
+  /* Inside the zoomed strip: undo --bt-ui-scale on the screen-px inset. */
+  left: calc(var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) + 16px);
+  right: 8px;
+}
+
+.epic-timeline--vertical.epic-timeline--side-right .timeline-chrome-bottom-stack {
+  right: calc(var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) + 16px);
+  left: 8px;
+}
+
+.epic-timeline--vertical.epic-timeline--side-right .timeline-chrome-controls-row {
+  flex-direction: row-reverse;
+}
+
+.epic-timeline--vertical.epic-timeline--side-right .timeline-chrome-date-wrap {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.epic-timeline--vertical.epic-timeline--side-right .timeline-chrome-date-wrap #current-time-text {
+  text-align: left;
+}
+
+.epic-timeline--vertical.epic-timeline--side-left .timeline-chrome-transport {
+  flex-direction: row;
+}
+
+.epic-timeline--vertical.epic-timeline--side-right .timeline-chrome-transport {
+  flex-direction: row-reverse;
+}
+
+.timeline-chrome-play-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+/* The play / pause button is at the bottom-middle of the globe screen (the Earth half in a split). Portrait: the
+   controls row is that width, so the middle of the row. */
+.epic-timeline--horizontal .timeline-chrome-play-row {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  /* On the date / time's row: Skypics drops that to just above the strip in a split (--sky-date-drop). */
+  transform: translate(-50%, var(--sky-date-drop, 0px));
+}
+
+/* The globe screen's width and middle, from the screen's left (the split's share in `--bt-split`). */
+body {
+  --bt-earth-w: 100vw;
+  --bt-earth-cx: 50vw;
+}
+
+body.bt-split-row {
+  --bt-earth-w: calc((1 - var(--bt-split, 0)) * 100vw);
+  --bt-earth-cx: calc(var(--bt-earth-w) / 2);
+}
+
+body.bt-split-row.bt-split-flip {
+  --bt-earth-cx: calc(var(--bt-split, 0) * 100vw + var(--bt-earth-w) / 2);
+}
+
+/* Landscape: the row stops short of the strip, so its middle is not the globe's: the button is fixed to the
+   screen at the globe's middle, in line with the row's bottom (the strip is zoomed: undo it on the screen px). */
+.epic-timeline--vertical .timeline-chrome-play-row {
+  position: fixed;
+  left: calc(var(--bt-earth-cx) / var(--bt-ui-scale, 1));
+  bottom: 8px;
+  transform: translateX(-50%);
+}
+
+body.bt-split-col .epic-timeline--vertical .timeline-chrome-play-row {
+  bottom: calc(var(--bt-split, 0) * 100vh / var(--bt-ui-scale, 1) + 8px);
+}
+
+/* Landscape: the date has what lies between the button and the globe screen's edge (8 px from it, 30 px from the
+   middle: half the button and a gap). */
+.epic-timeline--vertical .timeline-chrome-date-wrap {
+  max-width: calc(var(--bt-earth-w) / 2 / var(--bt-ui-scale, 1) - 38px);
+}
+
+.timeline-analemma-cluster {
+  flex-direction: row;
+  align-items: center;
+}
+
+.timeline-analemma-caption:not(:has(.analemma-caption-title:not(:empty))) {
+  display: none;
+}
+
+.timeline-analemma-caption .analemma-caption-past[hidden],
+.timeline-analemma-caption .analemma-caption-since[hidden],
+.timeline-analemma-caption .analemma-caption-preload[hidden] {
+  display: none !important;
+}
+
+.timeline-chrome-speed-wrap .time-bar-speed {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.speed-preset-menu .speed-preset-group-label {
+  display: block;
+  padding: 6px 10px 2px;
+  color: rgba(255, 255, 255, 0.45);
+  font: 600 10px/1.2 Consolas, "Courier New", monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.speed-preset-menu .speed-preset-option[hidden] {
+  display: none !important;
+}
+
+/* Split view (bt/split_view.js): the time chrome stays with the Earth half.
+   Portrait (col): the strip rises with the pane. Landscape (row): a strip on
+   the pane's side moves in with it. */
+body.bt-split-col .epic-timeline--horizontal {
+  bottom: calc(var(--bt-split, 0) * 100%);
+}
+
+body.bt-split-row:not(.bt-split-flip) .epic-timeline--vertical.epic-timeline--side-right {
+  right: calc(var(--bt-split, 0) * 100%);
+}
+
+body.bt-split-row.bt-split-flip .epic-timeline--vertical.epic-timeline--side-left {
+  left: calc(var(--bt-split, 0) * 100%);
+}
+
+/* The Earth half's orientation (earth_orientation.js) picks the timeline's,
+   so a divider drag can give a side-by-side split a horizontal timeline, or a
+   stacked split a vertical one: kept within the Earth half too. */
+body.bt-split-row:not(.bt-split-flip) .epic-timeline--horizontal {
+  right: calc(var(--bt-split, 0) * 100%);
+}
+
+body.bt-split-row.bt-split-flip .epic-timeline--horizontal {
+  left: calc(var(--bt-split, 0) * 100%);
+}
+
+body.bt-split-col .epic-timeline--vertical {
+  bottom: calc(var(--bt-split, 0) * 100%);
+}
+
+body.bt-split-col .epic-timeline--vertical .timeline-chrome-bottom-stack {
+  bottom: calc(var(--bt-split, 0) * 100vh / var(--bt-ui-scale, 1) + 8px);
+}
+
+/* The landscape bottom stack (date, play, speed) is fixed to the screen, not to the strip, so the strip's move
+   with the split does not reach it: its edges are kept inside the Earth half here. The edge toward the pane moves
+   in by the pane's share; so does the one by the strip when the strip sits on the pane's side of the screen. */
+body.bt-split-row:not(.bt-split-flip) .epic-timeline--vertical.epic-timeline--side-left .timeline-chrome-bottom-stack {
+  right: calc(var(--bt-split, 0) * 100vw / var(--bt-ui-scale, 1) + 8px);
+}
+
+body.bt-split-row:not(.bt-split-flip) .epic-timeline--vertical.epic-timeline--side-right .timeline-chrome-bottom-stack {
+  right: calc(var(--bt-split, 0) * 100vw / var(--bt-ui-scale, 1) + var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) + 16px);
+}
+
+body.bt-split-row.bt-split-flip .epic-timeline--vertical.epic-timeline--side-right .timeline-chrome-bottom-stack {
+  left: calc(var(--bt-split, 0) * 100vw / var(--bt-ui-scale, 1) + 8px);
+}
+
+body.bt-split-row.bt-split-flip .epic-timeline--vertical.epic-timeline--side-left .timeline-chrome-bottom-stack {
+  left: calc(var(--bt-split, 0) * 100vw / var(--bt-ui-scale, 1) + var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) + 16px);
+}
+
+/* Generic play button + speed menu (timeline_playback_ui.js). */
+.timeline-playback-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: inherit;
+}
+
+.timeline-playback-controls button,
+.timeline-playback-controls select {
+  font: inherit;
+  font-size: 0.8rem;
+  height: 2rem;
+  color: #d8dde6;
+  background: rgba(12, 16, 22, 0.72);
+  border: 1px solid rgba(200, 210, 220, 0.25);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.timeline-playback-play {
+  min-width: 2.4rem;
+  padding: 0 0.6rem;
+}
+
+.timeline-playback-play.active {
+  color: #05070a;
+  background: #9ecbff;
+  border-color: #9ecbff;
+}
+
+.timeline-playback-speed {
+  padding: 0 0.4rem;
+}
+
+.timeline-playback-now {
+  padding: 0 0.7rem;
+}

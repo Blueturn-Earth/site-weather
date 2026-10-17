@@ -1,0 +1,52 @@
+.smoke-perimeter {
+  pointer-events: none;
+  cursor: default;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.45));
+}
+
+.smoke-perimeter-hit {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.smoke-label {
+  pointer-events: auto;
+  cursor: pointer;
+  font: 700 13px/1.25 system-ui, sans-serif;
+}
+
+.smoke-label-hit {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.smoke-label-meta {
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.wildfire-flame-marker {
+  pointer-events: none;
+  cursor: default;
+}
+
+.wildfire-flame-marker.is-decor {
+  pointer-events: none;
+  cursor: default;
+}
+
+.wildfire-hit {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.wildfire-label {
+  pointer-events: auto;
+  cursor: pointer;
+  font: 700 13px/1.25 system-ui, sans-serif;
+}
+
+.wildfire-label-meta {
+  font-weight: 500;
+  font-size: 11px;
+}
