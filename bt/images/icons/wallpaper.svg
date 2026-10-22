@@ -1,0 +1,12 @@
+<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.25"
+     stroke-linecap="round" stroke-linejoin="round"
+     xmlns="http://www.w3.org/2000/svg">
+  <!-- monitor -->
+  <rect x="2.5" y="3.5" width="19" height="13" rx="1.5"/>
+  <line x1="8" y1="20" x2="16" y2="20"/>
+  <line x1="12" y1="16.5" x2="12" y2="20"/>
+  <!-- earth disk -->
+  <circle cx="12" cy="10" r="4"/>
+  <ellipse cx="12" cy="10" rx="1.6" ry="4"/>
+  <line x1="8" y1="10" x2="16" y2="10"/>
+</svg>

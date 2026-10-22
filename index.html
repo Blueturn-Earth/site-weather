@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>window.__BT_PROD__=true;window.__BT_SITE__={"pinnedExtension":"weather","extensionless":false,"brand":{"name":"Projector Weather","aboutTitle":"Projector Weather","logo":"./brand/logo192.png","aboutSummary":["Follow hurricanes, eclipses and wildfire smoke around the Earth, as seen from the DSCOVR satellite at Lagrange point L1.","Created using HTML5, Javascript, WebGL and open NASA EPIC data."],"shareIntro":"Join me on Projector Weather."}}</script>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" href="brand/logo192.png" type="image/png">
+  <link rel="icon" href="brand/favicon.ico" sizes="any"> 
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="apple-touch-icon" href="brand/logo192.png">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Projector Weather</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js",
+      "firebase/auth": "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js",
+      "firebase/messaging": "https://www.gstatic.com/firebasejs/12.6.0/firebase-messaging.js",
+      "firebase/functions": "https://www.gstatic.com/firebasejs/12.6.0/firebase-functions.js",
+      "exifr": "https://cdn.jsdelivr.net/npm/exifr/dist/full.esm.js",
+      "tz-lookup": "https://cdn.jsdelivr.net/npm/tz-lookup@6.1.25/+esm",
+      "satellite.js": "https://cdn.jsdelivr.net/npm/satellite.js@6.0.2/+esm",
+      "hls.js": "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/+esm"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="./bt/style.css">
+  <link rel="stylesheet" href="./bt/split/split.css">
+  <link rel="stylesheet" href="./bt/timeline/timeline.css">
+  <link rel="stylesheet" href="./ext/shared/chip_filter.css">
+  <link rel="stylesheet" href="./ext/weather/style.css">
+  <link rel="stylesheet" href="./ext/weather/categories/storms/style.css">
+  <link rel="stylesheet" href="./ext/weather/categories/eclipses/style.css">
+  <link rel="stylesheet" href="./ext/weather/categories/smoke/style.css">
+  <!-- Optional online-only scripts (analytics / sky-photos). Core app must not depend on these. -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-V51HMX6F1Y"></script>
+  <script async src="https://cdn.jsdelivr.net/npm/piexifjs"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    {
+      const GA_ID = 'G-V51HMX6F1Y'; // must match the gtag/js URL above
+      // Super users (flag set by bt/analytics.js) are not counted.
+      try { if (localStorage.getItem('bt_super_user') === '1') window['ga-disable-' + GA_ID] = true; } catch (e) {}
+      gtag('js', new Date());
+      gtag('config', GA_ID);
+    }
+  </script>
+</head>
+<body>
+  <div id="topGL">
+    <div id="epicEarth">
+      <canvas id="glcanvas"></canvas>
+    </div>
+  </div>
+<div id="topUI" class="chrome-autohide" data-bt-screen-chrome>
+  <div id="oppositeTopChrome" class="opposite-top-chrome opposite-top-chrome--left">
+    <div class="opposite-top-row">
+      <div id="viewSideChrome" class="view-side-chrome view-side-chrome--left">
+        <div class="view-side-chrome-captions">
+          <div class="view-caption-select-row">
+            <label class="view-caption-select-wrap">
+              <select id="viewCaptionSelect" class="view-caption-title-select" aria-label="Position">
+                <option value="dscovr">DSCOVR</option>
+                <option value="l1">L1</option>
+                <option value="geo">GEOSTAT</option>
+                <option value="moon">MOON</option>
+                <option value="map" hidden>MAP</option>
+              </select>
+            </label>
+            <label class="view-caption-select-wrap view-caption-orient-wrap" id="earthUpSelectWrap" hidden>
+              <select id="earthUpSelect" class="view-caption-title-select" aria-label="Orientation">
+                <option value="j2000" selected>J2000</option>
+                <option value="dscovr" id="earthUpDscovrOption">DSCOVR</option>
+                <option value="ecliptic">Ecliptic</option>
+                <option value="zenith" id="earthUpZenithOption" hidden>Zenith</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              id="nowGeoShortcutBtn"
+              class="view-caption-shortcut"
+              hidden
+              aria-label="Switch to local geostationary view"
+              title="Switch to local geostationary view"
+            >LOCAL GEO</button>
+            <button type="button" id="viewCaptionShow" class="view-caption-show">Show views info</button>
+          </div>
+          <div id="zoomViewCaption" class="view-caption" hidden>
+            <div id="zoomViewCaptionBody" class="view-caption-body"></div>
+            <div class="view-caption-bm-note">Showing Blue Marble data until NASA/EPIC data is loaded</div>
+          </div>
+          <div id="mapViewCaption" class="view-caption" hidden>
+            <div id="mapViewCaptionBody" class="view-caption-body"></div>
+            <div class="view-caption-bm-note">Showing Blue Marble data until NASA/EPIC data is loaded</div>
+          </div>
+          <div id="dscovrViewCaption" class="view-caption">
+            <div class="view-caption-body">Most Real Whole-Earth view from NASA's DSCOVR satellite, which orbits around Lagrange point L1, ~1&nbsp;million miles away (1.5M&nbsp;km).<br>Hourly images from NASA's EPIC camera, with 3D interpolation between frames.<br>Data typically lags by a few days (see botom date label).</div>
+            <div class="view-caption-body view-caption-orient" id="dscovrViewCaptionOrient"></div>
+            <div class="view-caption-bm-note">Showing Blue Marble data until NASA/EPIC data is loaded</div>
+          </div>
+          <div id="l1ViewCaption" class="view-caption" hidden>
+            <div class="view-caption-body">Exact Sun–Earth L1, on the line of the Sun (~1.5M&nbsp;km).<br>DSCOVR orbits around L1, so this recenters the subsolar point. NASA EPIC imagery — additional limbs are simulated.</div>
+            <div class="view-caption-body view-caption-orient" id="l1ViewCaptionOrient"></div>
+            <div class="view-caption-bm-note">Showing Blue Marble data until NASA/EPIC data is loaded</div>
+          </div>
+          <div id="moonViewCaption" class="view-caption" hidden>
+            <div class="view-caption-body">Earth as seen from the Moon.<br>Phases are opposite: new Moon is full Earth, and vice versa.</div>
+            <div class="view-caption-bm-note">Showing Blue Marble data until NASA/EPIC data is loaded</div>
+          </div>
+          <div id="geoViewCaption" class="view-caption" hidden>
+            <div class="view-caption-body">Looking from ~36,000&nbsp;km above the equator.<br>NASA DSCOVR/EPIC imagery — centroid times may be offset from the clock.<br>Night side, stars, and Sun are simulated.</div>
+            <div class="view-caption-bm-note">Showing Blue Marble data until NASA/EPIC data is loaded</div>
+          </div>
+          <div id="analemmaModeViewNote" class="view-caption-body view-caption-analemma-mode" hidden>
+            Analemma mode: play keeps the same hour and jumps a day at a time, so the Sun traces its yearly figure-eight.
+          </div>
+          <button type="button" id="viewCaptionToggle" class="view-caption-toggle">Hide this info</button>
+        </div>
+      </div>
+      <div id="selection-time-text" class="time-bar-selection" hidden title="Leave this event"></div>
+    </div>
+  </div>
+  <div id="playPauseFlash" class="play-pause-flash" hidden aria-hidden="true">
+    <div id="playPauseFlashCluster" class="play-pause-flash-cluster">
+      <span id="playPauseFlashIcon" class="play-pause-flash-icon"></span>
+    </div>
+  </div>
+  <div id="appMenu" class="menu-corner-right">
+    <div class="corner-control">
+      <div class="menu-hamburger-row">
+        <button id="menuButton" type="button" aria-label="Menu" aria-expanded="false" aria-haspopup="true">
+          <img id="menuButtonIcon" src="./bt/images/icons/menu.svg" alt="" width="30" height="30"
+               data-menu-icon="./bt/images/icons/menu.svg" />
+        </button>
+      </div>
+    </div>
+    <div id="menuPanel" class="menu-panel" hidden>
+      <!-- Account (Sign in / Sign out) -->
+      <button type="button" class="menu-item" id="menuAccount">
+        <img src="./bt/images/icons/profile.svg" alt="" class="menu-item-icon" id="menuAccountIcon"
+             data-default-icon="./bt/images/icons/profile.svg" />
+        <span id="menuAccountLabel">Sign in</span>
+      </button>
+      <button type="button" class="menu-item" id="menuShare">
+        <img src="./bt/images/icons/share.svg" alt="" class="menu-item-icon" />
+        <span>Share</span>
+      </button>
+      <button type="button" class="menu-item" id="menuMovieClip" hidden>
+        <img src="./bt/images/icons/analemma.svg" alt="" class="menu-item-icon" />
+        <span class="menu-item-label">Movie Clip</span>
+      </button>
+      <button type="button" class="menu-item" id="menuWallpaper">
+        <img src="./bt/images/icons/wallpaper.svg" alt="" class="menu-item-icon" />
+        <span>Set as Wallpaper</span>
+      </button>
+      <button type="button" class="menu-item" id="menuMapMode" hidden>
+        <img src="./bt/images/icons/equirect_map.svg" alt="" class="menu-item-icon" id="menuMapModeIcon"
+             data-globe="./bt/images/icons/round_earth.svg"
+             data-map="./bt/images/icons/equirect_map.svg" />
+        <span id="menuMapModeLabel">Map mode</span>
+      </button>
+      <button type="button" class="menu-item" id="menuSettings">
+        <img src="./bt/images/icons/settings.svg" alt="" class="menu-item-icon" />
+        <span>Settings</span>
+      </button>
+      <button type="button" class="menu-item" id="menuHelp">
+        <img src="./bt/images/icons/help.svg" alt="" class="menu-item-icon" />
+        <span>Help</span>
+      </button>
+      <button type="button" class="menu-item" id="menuAbout">
+        <img src="./bt/images/icons/round_earth.svg" alt="" class="menu-item-icon" />
+        <span>About</span>
+      </button>
+    </div>
+  </div>
+  <div id="settingsPanel" class="settings-panel" data-bt-screen-chrome hidden>
+    <div class="settings-backdrop"></div>
+    <div class="settings-dialog" role="dialog" aria-labelledby="settingsTitle" aria-modal="true">
+      <button type="button" class="settings-close" id="settingsClose" aria-label="Close">&times;</button>
+      <h2 id="settingsTitle" class="settings-title">Settings</h2>
+      <label class="settings-field">
+        <span class="settings-label">Menu position</span>
+        <select id="settingsMenuCorner" class="settings-control">
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+      </label>
+      <label class="settings-field settings-field-checkbox">
+        <input type="checkbox" id="settingsZoomCircle" class="settings-control" checked />
+        <span>Zoom circle</span>
+      </label>
+      <label class="settings-field settings-field-checkbox">
+        <input type="checkbox" id="settingsDiskClip" class="settings-control" checked />
+        <span>Earth disk clipping</span>
+      </label>
+      <label class="settings-field">
+        <span class="settings-label">Day/night blend</span>
+        <div class="settings-slider">
+          <input type="range" id="settingsTerminatorWidth" class="settings-control" min="0.05" max="0.5" step="0.01" value="0.10" />
+          <output id="settingsTerminatorWidthLabel" class="settings-slider-value" for="settingsTerminatorWidth">10%</output>
+        </div>
+      </label>
+      <label class="settings-field">
+        <span class="settings-label">City lights</span>
+        <div class="settings-slider">
+          <input type="range" id="settingsCityLightsGain" class="settings-control" min="0" max="1" step="0.01" value="0.12" />
+          <output id="settingsCityLightsGainLabel" class="settings-slider-value" for="settingsCityLightsGain">12%</output>
+        </div>
+      </label>
+      <label class="settings-field">
+        <span class="settings-label">Cloud height</span>
+        <div class="settings-slider">
+          <input type="range" id="settingsCloudHeight" class="settings-control" min="0" max="50" step="1" value="5" />
+          <output id="settingsCloudHeightLabel" class="settings-slider-value" for="settingsCloudHeight">5 km</output>
+        </div>
+      </label>
+      <p class="settings-hint">Over Blue Marble with live clouds, how high the clouds sit above the ground: the higher, the farther their shadow falls from them. Real clouds are 1 to 10 km. 0 turns the cloud shadow off.</p>
+      <label class="settings-field settings-field-checkbox">
+        <input type="checkbox" id="settingsElasticTilt" class="settings-control" checked />
+        <span>Elastic GEO tilt</span>
+      </label>
+      <p class="settings-hint">Long-press the globe for GEOSTAT longitude. On: springs back when you release. Off: stay in GEOSTAT (Back / Escape returns to the view you came from). Desktop: hold Shift while dragging to park.</p>
+      <label class="settings-field settings-field-checkbox" id="settingsTrueColorField">
+        <input type="checkbox" id="settingsTrueColor" class="settings-control" />
+        <span>True Color</span>
+      </label>
+      <p class="settings-hint">Only real NASA EPIC photographs of the Earth. Off: past the latest EPIC image and over EPIC gaps, Blue Marble with clouds built from EUMETSAT data, up to the real now.</p>
+      <label class="settings-field settings-field-checkbox">
+        <input type="checkbox" id="settingsAutoHideChrome" class="settings-control" checked />
+        <span>Hide controls when idle (5s)</span>
+      </label>
+      <label class="settings-field settings-field-checkbox">
+        <input type="checkbox" id="settingsPowerSaveRender" class="settings-control" />
+        <span>Power save when idle</span>
+      </label>
+      <p class="settings-hint">While controls are hidden and playback is paused, redraw the globe about once per minute (about 30 fps otherwise).</p>
+      <label class="settings-field settings-field-checkbox">
+        <input type="checkbox" id="settingsShowCaptions" class="settings-control" checked />
+        <span>Show view info</span>
+      </label>
+      <label class="settings-field settings-field-checkbox">
+        <input type="checkbox" id="settingsShowSpeedHint" class="settings-control" checked />
+        <span>Drag hints</span>
+      </label>
+      <label class="settings-field">
+        <span class="settings-label">EPIC images source</span>
+        <select id="settingsEpicSource" class="settings-control">
+          <option value="nasa">NASA</option>
+          <option value="nasa-proxy" selected>NASA (proxy)</option>
+          <option value="bt-s3">BT-S3</option>
+          <option value="bt-cdn">BT-CDN</option>
+        </select>
+      </label>
+      <label class="settings-field">
+        <span class="settings-label">Paused image format</span>
+        <select id="settingsImgFormat" class="settings-control">
+          <option value="jpg">JPG</option>
+          <option value="png" selected>PNG</option>
+        </select>
+      </label>
+      <label class="settings-field">
+        <span class="settings-label">Scrub deceleration</span>
+        <div class="settings-slider">
+          <input type="range" id="settingsDeceleration" class="settings-control" min="0.02" max="1" step="0.01" value="0.10" />
+          <output id="settingsDecelerationLabel" class="settings-slider-value" for="settingsDeceleration">0.10</output>
+        </div>
+      </label>
+      <p class="settings-hint">After you release a paused time-scrub, Earth keeps turning and slows until it snaps to an EPIC frame. Higher values stop sooner.</p>
+      <div class="settings-field">
+        <button type="button" id="settingsClearCache" class="settings-action">Clear cache</button>
+      </div>
+    </div>
+  </div>
+  <div id="helpPanel" class="about-panel help-panel" data-bt-screen-chrome hidden>
+    <div class="about-backdrop"></div>
+    <div class="about-dialog help-dialog" role="dialog" aria-labelledby="helpTitle" aria-modal="true">
+      <button type="button" class="about-close" id="helpClose" aria-label="Close">&times;</button>
+      <h2 id="helpTitle" class="settings-title">Help</h2>
+      <div id="helpBody" class="help-body"></div>
+    </div>
+  </div>
+  <div id="aboutPanel" class="about-panel" data-bt-screen-chrome hidden>
+    <div class="about-backdrop"></div>
+    <div class="about-dialog" role="dialog" aria-labelledby="aboutTitle" aria-modal="true">
+      <button type="button" class="about-close" id="aboutClose" aria-label="Close">&times;</button>
+      <div class="about-brand">
+        <img src="./brand/logo192.png" alt="" class="about-pe-logo" width="64" height="64" />
+        <h1 id="aboutTitle">Projector Weather</h1>
+      </div>
+      <p class="about-version"></p>
+      <div class="about-summary">
+        <p>Interactive 3D Earth visualization using NASA's EPIC imagery from DSCOVR satellite hovering at Lagrange point L1.</p>
+        <p id="aboutSummaryLine2"></p>
+        <p>Created using HTML5, Javascript, WebGL and open NASA EPIC data.</p>
+        <p id="aboutSourcesLine">Imagery: NASA/NOAA DSCOVR:EPIC. Where EPIC is missing or late, clouds come from EUMETSAT geostationary imagery (with @MattEason's processing).</p>
+        <p>To learn more about how it works, read the <a href="https://epic.projector.earth/whitepaper/" id="aboutWhitepaperLink" target="_blank" rel="noopener noreferrer">Whitepaper</a>.
+        </p>
+      </div>
+      <div class="about-links">
+        <a href="https://projector.earth" id="aboutPeLink" class="about-link" target="_blank" rel="noopener noreferrer">
+          <img src="./bt/images/logos/LogoPE512.png" alt="projector.earth" />
+        </a>
+        <a href="https://epic.gsfc.nasa.gov/" id="aboutNasaLink" class="about-link" target="_blank" rel="noopener noreferrer">
+          <img src="./bt/images/logos/NASA_logo.png" alt="NASA EPIC" />
+        </a>
+        <a href="https://www.eumetsat.int/" id="aboutEumetsatLink" class="about-link" target="_blank" rel="noopener noreferrer">
+          <img src="./bt/images/logos/EUMETSAT_logo.png" alt="EUMETSAT" />
+        </a>
+        <a href="https://blueturn.earth" id="aboutBtLink" class="about-link" target="_blank" rel="noopener noreferrer">
+          <img src="./bt/images/logos/LogoBTV1024BT.png" alt="Blueturn" />
+        </a>
+      </div>
+      <p class="about-contact">
+        <a href="mailto:info@projector.earth" id="aboutContactLink">info@projector.earth</a>
+        &middot; <a href="https://epic.projector.earth/privacy/" id="aboutPrivacyLink" target="_blank" rel="noopener noreferrer">Privacy</a>
+        &middot; <a href="https://epic.projector.earth/terms/" id="aboutTermsLink" target="_blank" rel="noopener noreferrer">Terms</a>
+      </p>
+    </div>
+  </div>
+  <div id="wallpaperPanel" class="about-panel wallpaper-panel" data-bt-screen-chrome hidden>
+    <div class="about-backdrop"></div>
+    <div class="about-dialog wallpaper-dialog" role="dialog" aria-labelledby="wallpaperTitle" aria-modal="true">
+      <button type="button" class="about-close" id="wallpaperClose" aria-label="Close">&times;</button>
+      <h2 id="wallpaperTitle" class="settings-title">Set as Wallpaper</h2>
+      <div id="wallpaperBody" class="wallpaper-body"></div>
+      <div class="wallpaper-url-row">
+        <code id="wallpaperUrlText" class="wallpaper-url-text"></code>
+        <div class="wallpaper-url-actions">
+          <button type="button" class="settings-action" id="wallpaperCopyBtn">Copy</button>
+          <a class="settings-action" id="wallpaperOpenLink" href="https://epic.projector.earth?mode=wallpaper&amp;view=geostat_local" target="_blank" rel="noopener noreferrer">Open</a>
+        </div>
+      </div>
+      <p id="wallpaperCopyStatus" class="wallpaper-copy-status" hidden>Copied</p>
+      <details class="wallpaper-other">
+        <summary>Other platforms</summary>
+        <div id="wallpaperOtherBody" class="wallpaper-other-body"></div>
+      </details>
+    </div>
+  </div>
+  <div id="movieClipPanel" class="about-panel movie-clip-panel" data-bt-screen-chrome hidden>
+    <div class="about-backdrop"></div>
+    <div class="about-dialog movie-clip-dialog" role="dialog" aria-labelledby="movieClipTitle" aria-modal="true">
+      <button type="button" class="about-close" id="movieClipClose" aria-label="Close">&times;</button>
+      <h2 id="movieClipTitle" class="settings-title">Movie Clip</h2>
+      <section class="movie-clip-row" id="movieClipNewRow">
+        <h3 class="movie-clip-row-title">New</h3>
+        <dl class="movie-clip-props" id="movieClipNewProps">
+          <dt>Date</dt>
+          <dd class="movie-clip-range-cell">
+            <input type="date" id="movieClipDate" aria-label="Date">
+          </dd>
+          <dt>Time</dt>
+          <dd class="movie-clip-range-cell">
+            <span id="movieClipTimeCell">
+              <input type="time" id="movieClipTime" step="1" aria-label="Time">
+              <span class="movie-clip-utc">UTC</span>
+            </span>
+          </dd>
+          <dt>Speed</dt>
+          <dd class="movie-clip-range-cell">
+            <select id="movieClipSpeed" aria-label="Speed"></select>
+          </dd>
+          <dt>Range</dt>
+          <dd class="movie-clip-range-cell">
+            <select id="movieClipRange" aria-label="Range">
+              <option value="current">Current Cycle</option>
+              <option value="last">Last Cycle</option>
+              <option value="next">Next Cycle</option>
+              <option value="till_last">Till Last Available</option>
+            </select>
+          </dd>
+          <dt>Position</dt>
+          <dd class="movie-clip-range-cell">
+            <select id="movieClipViewPos" aria-label="Position"></select>
+          </dd>
+          <dt>Orientation</dt>
+          <dd class="movie-clip-range-cell">
+            <select id="movieClipOrient" aria-label="Orientation"></select>
+          </dd>
+          <dt>Extension</dt>
+          <dd class="movie-clip-range-cell">
+            <select id="movieClipExtension" aria-label="Extension"></select>
+          </dd>
+        </dl>
+        <p class="movie-clip-estimate" id="movieClipNewEstimate"></p>
+        <p class="movie-clip-error" id="movieClipNewError" hidden></p>
+        <label class="movie-clip-notify" id="movieClipNotifyRow">
+          <input type="checkbox" id="movieClipNotify">
+          Notify me when the movie is ready
+        </label>
+        <div class="movie-clip-actions">
+          <button type="button" class="settings-action movie-clip-start" id="movieClipStart">Start</button>
+        </div>
+      </section>
+      <section class="movie-clip-row" id="movieClipLastRow" hidden>
+        <h3 class="movie-clip-row-title">Ready</h3>
+        <dl class="movie-clip-props" id="movieClipLastProps"></dl>
+        <div class="movie-clip-actions">
+          <button type="button" class="settings-action" id="movieClipDownload">Download</button>
+          <button type="button" class="settings-action" id="movieClipShare">Share</button>
+          <button type="button" class="settings-action" id="movieClipReadyNew">New</button>
+          <button type="button" class="settings-action" id="movieClipReadyDrop">Drop</button>
+        </div>
+      </section>
+      <section class="movie-clip-row" id="movieClipBakingRow" hidden>
+        <h3 class="movie-clip-row-title">Baking</h3>
+        <dl class="movie-clip-props" id="movieClipBakingProps"></dl>
+        <div class="movie-clip-bake-track" id="movieClipBakingBar" aria-hidden="true">
+          <span class="movie-clip-bake-fill"></span>
+        </div>
+        <dl class="movie-clip-props movie-clip-progress-props" id="movieClipBakingProgress"></dl>
+        <div class="movie-clip-actions">
+          <button type="button" class="settings-action" id="movieClipDownloadSoFar">Download</button>
+          <button type="button" class="settings-action" id="movieClipCancel">Cancel</button>
+        </div>
+      </section>
+      <section class="movie-clip-row" id="movieClipConfirmRow" hidden>
+        <h3 class="movie-clip-row-title" id="movieClipConfirmTitle">Confirm</h3>
+        <p class="movie-clip-estimate" id="movieClipConfirmText"></p>
+        <div class="movie-clip-actions">
+          <button type="button" class="settings-action movie-clip-start" id="movieClipConfirmOk">OK</button>
+          <button type="button" class="settings-action" id="movieClipConfirmBack">Back</button>
+        </div>
+      </section>
+    </div>
+  </div>
+  <input type="date" id="date-picker" class="time-corner-left">
+  <div id="epicTimeline" class="epic-timeline epic-timeline--horizontal epic-timeline--pending" data-bt-chrome-block aria-label="EPIC timeline">
+    <canvas class="epic-timeline-canvas"></canvas>
+    <div id="timelineChrome" class="timeline-chrome">
+      <div class="timeline-chrome-inner">
+        <div class="timeline-chrome-bottom-stack">
+          <div class="timeline-chrome-controls-row">
+            <div class="timeline-chrome-transport">
+              <div class="timeline-chrome-speed-wrap time-bar-speed-wrap">
+                <button type="button" id="timeBarSpeed" class="time-bar-speed" aria-haspopup="listbox" aria-expanded="false" aria-controls="speedPresetMenu" title="Time speed — tap to choose, or drag up/down">1h/s (x3600)</button>
+                <div id="speedPresetMenu" class="speed-preset-menu" data-bt-screen-chrome hidden role="listbox" aria-label="Time speed"></div>
+              </div>
+              <div class="timeline-chrome-play-row">
+                <div class="play-stack">
+                  <div id="loading-text">Loading...</div>
+                  <button type="button" id="playToggleBtn" class="play-toggle-btn" aria-pressed="true" title="Pause" aria-label="Pause">
+                    <span class="play-toggle-icon" aria-hidden="true">❚❚</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="timeline-chrome-date-wrap">
+              <div id="current-time-text" class="time-bar-date" title="Jump to date"></div>
+              <div id="analemmaCaption" class="analemma-caption timeline-analemma-caption" hidden>
+                <div id="analemmaPreloadLine" class="analemma-caption-preload" hidden></div>
+                <div id="analemmaTitleLine" class="analemma-caption-title">Analemma</div>
+                <div id="analemmaPastLine" class="analemma-caption-past">(Same hour every day)</div>
+                <div id="analemmaSinceLine" class="analemma-caption-since">Since 2026/08/16</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+  <div id="dragHintStack" class="drag-hint-stack">
+    <div id="speedDragToast" class="speed-drag-toast is-hint" hidden aria-live="polite" title="Drag hints">
+      <div class="speed-drag-toast-lines">
+        <div class="speed-drag-toast-main">
+          <span class="speed-drag-arrows" aria-hidden="true">
+            <span class="speed-drag-arrow up">▲</span>
+            <span class="speed-drag-arrow down">▼</span>
+          </span>
+          <span id="speedDragToastLabel" class="speed-drag-label">Drag up/down to change speed</span>
+        </div>
+        <div class="speed-drag-toast-main">
+          <span class="speed-drag-arrows speed-drag-arrows-hint-x" aria-hidden="true">
+            <span class="speed-drag-arrow left">◀</span>
+            <span class="speed-drag-arrow right">▶</span>
+          </span>
+          <span id="speedDragToastLabelX" class="speed-drag-label">Drag left/right to scrub time</span>
+        </div>
+      </div>
+      <button type="button" id="speedDragToastHide" class="speed-drag-toast-hide">hide</button>
+    </div>
+  </div>
+  <div id="speedDragValueToast" class="speed-drag-value-toast" hidden aria-live="polite">
+    <span id="speedDragValueTitle" class="speed-drag-value-title"></span>
+    <span class="speed-drag-value-row">
+      <span class="speed-drag-arrows speed-drag-arrows-y" aria-hidden="true">
+        <span class="speed-drag-arrow up">▲</span>
+        <span class="speed-drag-arrow down">▼</span>
+      </span>
+      <span class="speed-drag-arrows speed-drag-arrows-x" aria-hidden="true" hidden>
+        <span class="speed-drag-arrow left">◀</span>
+        <span class="speed-drag-arrow right">▶</span>
+      </span>
+      <span id="speedDragValueLabel" class="speed-drag-value-label"></span>
+    </span>
+  </div>
+  <script src="./bt/vendor/gl-matrix-min.js"></script>
+  <script type="module">
+    if (window.__BT_PROD__) {
+      await import('./bt/version.js');
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = './bt.js';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    } else {
+      await import('./entry.js');
+    }
+  </script>
+</body>
+</html>
+

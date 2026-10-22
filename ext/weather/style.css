@@ -1,0 +1,650 @@
+#weatherOverlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 16;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#weatherSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  /*
+   * Must be auto on touch: parent pointer-events:none + child auto works on
+   * desktop but often fails on mobile (hit targets never receive the tap).
+   * Empty SVG space stays a globe gesture via data-bt-globe-surface.
+   */
+  pointer-events: auto;
+  /* Event marker scale (CSS px); outline icons, not viewport-scaled. */
+  --event-marker-r: 5px;
+}
+
+/*
+ * Globe map labels: halo via text-shadow only.
+ * Samsung Internet maps SVG text stroke / paint-order:stroke to -webkit-text-stroke
+ * and paints currentColor (often white), ignoring the actual stroke color.
+ */
+#weatherSvg .wildfire-label,
+#weatherSvg .smoke-label,
+#weatherSvg .hurricane-track-label,
+#weatherSvg .hurricane-track-point-label,
+#weatherSvg .eclipse-path-label {
+  color: #000;
+  stroke: none;
+  stroke-width: 0;
+  paint-order: fill;
+  -webkit-text-stroke: 0;
+  text-shadow: var(--chrome-text-halo);
+}
+
+#weatherSvg .is-hover-label {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+#weatherSvg.has-selection .weather-overlay-event:not(.is-selected) {
+  opacity: 0.4;
+}
+
+#weatherSvg .wildfire-label tspan {
+  stroke: none;
+  stroke-width: 0;
+  -webkit-text-stroke: 0;
+}
+
+#weatherSvg .event-selection-halo {
+  pointer-events: none;
+}
+
+#weatherWikiFiche {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: var(--z-overlay-event-fiche, 19);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Explicit width: YT alone uses aspect-ratio from this; max-width-only collapses to 0. */
+  width: min(320px, 80vw);
+  max-width: min(320px, 80vw);
+  box-sizing: border-box;
+  color: #f4f4f4;
+  font: 12px / 1.35 system-ui, sans-serif;
+  pointer-events: none;
+  text-shadow: var(--chrome-text-halo);
+}
+
+#weatherWikiFiche[hidden] {
+  display: none !important;
+}
+
+#weatherWikiFiche .weather-wiki-panel,
+#weatherWikiFiche .weather-yt-panel {
+  position: relative;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+}
+
+#weatherWikiFiche .weather-wiki-panel[hidden],
+#weatherWikiFiche .weather-yt-panel[hidden] {
+  display: none !important;
+}
+
+#weatherWikiFiche .weather-fiche-close {
+  pointer-events: auto;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #f4f4f4;
+  font: 16px / 22px system-ui, sans-serif;
+  text-align: center;
+  cursor: pointer;
+  text-shadow: none;
+}
+
+#weatherWikiFiche .weather-fiche-close:hover,
+#weatherWikiFiche .weather-fiche-close:focus-visible,
+#weatherWikiFiche .weather-fiche-dock:hover,
+#weatherWikiFiche .weather-fiche-dock:focus-visible {
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  outline: none;
+}
+
+/* Floating panels: back to the split pane, under the × (wiki_fiche.js). */
+#weatherWikiFiche .weather-fiche-dock {
+  pointer-events: auto;
+  position: absolute;
+  top: 26px;
+  right: 2px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #f4f4f4;
+  cursor: pointer;
+}
+
+#weatherWikiFiche .weather-fiche-dock svg {
+  width: 16px;
+  height: 16px;
+}
+
+#weatherWikiFiche .weather-wiki-row {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  padding-right: 18px;
+}
+
+#weatherWikiFiche .weather-wiki-thumb {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+#weatherWikiFiche .weather-wiki-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+#weatherWikiFiche .weather-wiki-extract {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+  overflow: hidden;
+}
+
+/* Sized by the user (wiki_fiche.js): the text takes the lines its width makes, its panel the height they need. */
+#weatherWikiFiche.is-sized .weather-wiki-extract {
+  -webkit-line-clamp: var(--wiki-lines, 6);
+  line-clamp: var(--wiki-lines, 6);
+}
+
+#weatherWikiFiche .weather-wiki-link {
+  pointer-events: auto;
+  display: inline-block;
+  margin-top: 4px;
+  color: #9ecbff;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/*
+ * The floating fiche is moved by a strip along its top (leaving the buttons their corner) and resized by its
+ * bottom-right corner, as the ISS's floating video is (core floating_gestures.js). Not in the split pane.
+ */
+#weatherWikiFiche .weather-fiche-handle {
+  pointer-events: auto;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 28px;
+  z-index: 2;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  touch-action: none;
+}
+
+#weatherWikiFiche .weather-fiche-handle::before {
+  content: '';
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+#weatherWikiFiche.is-dragging .weather-fiche-handle {
+  cursor: grabbing;
+}
+
+#weatherWikiFiche .weather-fiche-grip {
+  pointer-events: auto;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 22px;
+  height: 22px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 55%, rgba(255, 255, 255, 0.6) 55%, rgba(255, 255, 255, 0.6) 65%, transparent 65%, transparent 75%, rgba(255, 255, 255, 0.6) 75%, rgba(255, 255, 255, 0.6) 85%, transparent 85%);
+}
+
+#weatherWikiFiche.is-split .weather-fiche-handle,
+#weatherWikiFiche.is-split .weather-fiche-grip {
+  display: none;
+}
+
+#weatherWikiFiche .weather-yt-panel {
+  padding: 8px;
+  width: 100%;
+  flex: 0 0 auto;
+}
+
+#weatherWikiFiche .weather-wiki-video {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #111;
+  pointer-events: auto;
+}
+
+#weatherWikiFiche .weather-wiki-yt-play {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #111;
+  cursor: pointer;
+}
+
+#weatherWikiFiche .weather-wiki-yt-thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#weatherWikiFiche .weather-wiki-yt-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  margin: 0;
+  border-style: solid;
+  border-width: 10px 0 10px 16px;
+  border-color: transparent transparent transparent rgba(255, 255, 255, 0.92);
+  transform: translate(-35%, -50%);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  pointer-events: none;
+}
+
+#weatherWikiFiche .weather-wiki-yt-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: auto;
+}
+
+/*
+ * The fiche in the split pane (wiki_fiche.js; the pane is the stage, `.is-split` the fiche in it).
+ * The video is as large as the pane lets it be, whole (16:9, never cropped); Wikipedia takes what remains.
+ * A pane narrower than 16:9 stacks them (video full width on top), a wider one puts them side by side
+ * (video full height on the left). With both showing, the video leaves Wikipedia at least --reserve.
+ * The buttons lie over the pane's top-left corner: everything starts below them (--top).
+ */
+.weather-split-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  container-type: size;
+}
+
+#weatherWikiFiche.is-split {
+  --reserve: 0px;
+  --top: calc(var(--bt-split-btn-size) + 16px);
+  inset: 0;
+  padding-top: var(--top);
+  z-index: auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  width: auto;
+  max-width: none;
+  transform: none !important;
+  pointer-events: auto;
+}
+
+#weatherWikiFiche.is-split.has-wiki {
+  --reserve: 140px;
+}
+
+#weatherWikiFiche.is-split .weather-fiche-close,
+#weatherWikiFiche.is-split .weather-fiche-dock {
+  display: none;
+}
+
+#weatherWikiFiche.is-split .weather-yt-panel {
+  /* First (top / left), before Wikipedia that comes first in the DOM. */
+  order: -1;
+  flex: 0 0 auto;
+  align-self: center;
+  aspect-ratio: 16 / 9;
+  width: min(100cqw, max(0px, calc((100cqh - var(--top) - var(--reserve)) * 16 / 9)));
+  padding: 0;
+  border-radius: 0;
+  background: #000;
+}
+
+#weatherWikiFiche.is-split .weather-wiki-video {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+#weatherWikiFiche.is-split .weather-wiki-panel {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 0;
+  background: #12161b;
+  /* As large as the panel allows, up to 20px (fitWikiFont in wiki_fiche.js). */
+  font-size: var(--wiki-font, 13px);
+  pointer-events: auto;
+}
+
+#weatherWikiFiche.is-split .weather-wiki-row {
+  padding-right: 0;
+}
+
+#weatherWikiFiche.is-split .weather-wiki-thumb {
+  width: 72px;
+  height: 72px;
+  flex-basis: 72px;
+}
+
+#weatherWikiFiche.is-split .weather-wiki-extract {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  overflow: visible;
+}
+
+@container (min-aspect-ratio: 16 / 9) {
+  #weatherWikiFiche.is-split {
+    flex-direction: row;
+  }
+
+  #weatherWikiFiche.is-split .weather-yt-panel {
+    width: auto;
+    height: min(calc(100cqh - var(--top)), max(0px, calc((100cqw - var(--reserve)) * 9 / 16)));
+  }
+}
+
+/* Fullscreen video: the video alone, as large as the whole screen lets it be; only the sound and the way out stay. */
+.weather-split-stage.is-fullscreen #weatherWikiFiche.is-split {
+  --reserve: 0px;
+  /* The buttons fade out on idle (chrome-autohide), the video takes all of the screen. */
+  --top: 0px;
+}
+
+.weather-split-stage.is-fullscreen #weatherWikiFiche.is-split .weather-wiki-panel {
+  display: none;
+}
+
+/* ── Event strip (sky-photos DragScroller layout) ── */
+
+:root {
+  --weather-scroll-select-border: 3px;
+  /* Fallback until bt/top_chrome_layout.js publishes --chrome-extension-row-top */
+  --chrome-extension-row-top: 54px;
+  --chrome-extension-filter-row-bottom: 88px;
+  --bottom-scroller-clearance: 120px;
+  --bottom-scroller-top: max(50vh, calc(100vh - 200px));
+}
+
+/* Portrait: scroller under the menu/filter row, full width */
+#weatherScrollGallery.horizontal {
+  top: auto;
+  bottom: var(--bottom-scroller-clearance);
+  left: 0;
+  right: 0;
+  height: min(84px, 18vh);
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x;
+}
+
+/* Landscape: same side as the menu, but only in the lower half. */
+#weatherScrollGallery.vertical {
+  width: min(114px, 34vw);
+  top: calc(var(--chrome-extension-filter-row-bottom, 88px) + 8px);
+  bottom: var(--bottom-scroller-clearance);
+  overflow-y: auto;
+  overflow-x: hidden;
+  touch-action: pan-y;
+}
+
+#weatherScrollGallery.vertical.scroll-menu-right {
+  /* Match the filter bar exterior (menu-corner + 8px gap). */
+  right: calc(var(--menu-corner-size, 56px) + 8px);
+  left: auto;
+}
+
+#weatherScrollGallery.vertical.scroll-menu-left {
+  left: calc(var(--menu-corner-size, 56px) + 8px);
+  right: auto;
+}
+
+/* The split pane on the menu's side (split_view.js `canPaneSide`): the menu column moves in to the split line, and the
+   strip beside it with it. */
+body.bt-split-row.bt-split-at-menu #weatherScrollGallery.vertical.scroll-menu-right {
+  right: calc(var(--bt-split, 0) * 100% + var(--menu-corner-size, 56px) + 8px);
+}
+
+body.bt-split-row.bt-split-at-menu #weatherScrollGallery.vertical.scroll-menu-left {
+  left: calc(var(--bt-split, 0) * 100% + var(--menu-corner-size, 56px) + 8px);
+}
+
+#weatherScrollGallery {
+  padding: var(--weather-scroll-select-border);
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  cursor: grab;
+  position: fixed;
+  z-index: 20;
+  /* #topUI is pointer-events:none; without this, card clicks hit the globe. */
+  pointer-events: auto;
+  /* Match .chip-filter-category outline — separate strip from date/time/speed */
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+#weatherScrollGallery::-webkit-scrollbar {
+  display: none;
+}
+
+#weatherScrollGallery.dragging {
+  cursor: grabbing;
+}
+
+#weatherScrollBox {
+  display: flex;
+  gap: var(--sky-scroll-gap, 5px);
+}
+
+#weatherScrollGallery.horizontal #weatherScrollBox {
+  flex-direction: row;
+  height: 100%;
+  align-items: stretch;
+}
+
+#weatherScrollGallery.vertical #weatherScrollBox {
+  flex-direction: column;
+  width: 100%;
+}
+
+.weather-scroll-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.62);
+  border: var(--weather-scroll-select-border) solid transparent;
+  box-sizing: border-box;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  -webkit-user-select: none;
+  user-select: none;
+  scroll-snap-align: center;
+  text-align: left;
+}
+
+#weatherScrollGallery.scroll-menu-right .weather-scroll-card {
+  text-align: right;
+}
+
+#weatherScrollGallery.scroll-menu-left .weather-scroll-card {
+  text-align: left;
+}
+
+#weatherScrollGallery.horizontal .weather-scroll-card {
+  height: 100%;
+  min-width: 100px;
+  max-width: 126px;
+}
+
+#weatherScrollGallery.vertical .weather-scroll-card {
+  width: 100%;
+  min-height: 68px;
+}
+
+.weather-scroll-card.is-selected {
+  border-color: #fff;
+  background: rgba(0, 0, 0, 0.78);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--event-color, #5dade2) 60%, transparent);
+}
+
+.weather-scroll-card.is-disabled {
+  /* Keep type/intensity hue; mute by darkening (no grayscale). */
+  opacity: 1;
+  cursor: pointer;
+  background: rgba(40, 40, 40, 0.55);
+}
+
+.weather-scroll-card.is-disabled .weather-scroll-name {
+  filter: brightness(0.55);
+}
+
+.weather-scroll-card.is-disabled .weather-scroll-type,
+.weather-scroll-card.is-disabled .weather-scroll-place,
+.weather-scroll-card.is-disabled .weather-scroll-country,
+.weather-scroll-card.is-disabled .weather-scroll-date {
+  opacity: 0.55;
+}
+
+.weather-scroll-card.is-disabled.is-selected {
+  border-color: color-mix(in srgb, var(--event-color, #5dade2) 45%, transparent);
+  box-shadow: none;
+}
+
+.weather-scroll-name {
+  font: 500 11px/1.15 system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weather-scroll-type,
+.weather-scroll-place,
+.weather-scroll-country,
+.weather-scroll-date {
+  font: 10px/1.2 system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weather-scroll-type {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.weather-scroll-place,
+.weather-scroll-country,
+.weather-scroll-date {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* Place / country may wrap on narrow vertical cards. */
+.weather-scroll-place,
+.weather-scroll-country {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.weather-scroll-place[hidden],
+.weather-scroll-country[hidden],
+.weather-scroll-type[hidden] {
+  display: none;
+}
+
+/* Settings → Weather databases */
+.settings-weather-catalogs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.settings-weather-catalogs-hint {
+  margin: 0 0 4px;
+  color: rgba(180, 180, 180, 0.85);
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.settings-weather-catalog-row {
+  margin: 0;
+}
+
+/* Another extension owns globe picks (areGlobePicksBlockedFor): not clickable. */
+#weatherOverlay.is-picks-blocked,
+#weatherOverlay.is-picks-blocked * {
+  pointer-events: none !important;
+}

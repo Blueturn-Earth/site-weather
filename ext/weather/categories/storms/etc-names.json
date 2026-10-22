@@ -1,0 +1,16 @@
+{
+  "source": "Notable North American extra-tropical cyclones (nor'easters / bomb cyclones). No official basin-wide naming; labels are conventional.",
+  "note": "Match rules for ERA5 Hodges/TRACK CSV: time overlap (±36h) + track fraction inside bbox. One track per name. Used when ingesting etc-era5-tracks.csv.",
+  "storms": [
+    { "name": "Juno", "group": "northeast", "startIso": "2015-01-25T00:00:00Z", "endIso": "2015-01-28T18:00:00Z", "latMin": 30, "latMax": 48, "lonMin": -80, "lonMax": -60 },
+    { "name": "Jonas", "group": "northeast", "startIso": "2016-01-21T00:00:00Z", "endIso": "2016-01-24T18:00:00Z", "latMin": 30, "latMax": 48, "lonMin": -82, "lonMax": -60 },
+    { "name": "January 2018 bomb cyclone", "group": "northeast", "startIso": "2018-01-03T00:00:00Z", "endIso": "2018-01-05T18:00:00Z", "latMin": 28, "latMax": 50, "lonMin": -85, "lonMax": -50 },
+    { "name": "Riley", "group": "northeast", "startIso": "2018-03-01T00:00:00Z", "endIso": "2018-03-04T00:00:00Z", "latMin": 32, "latMax": 48, "lonMin": -80, "lonMax": -58 },
+    { "name": "Skylar", "group": "northeast", "startIso": "2018-03-11T12:00:00Z", "endIso": "2018-03-14T18:00:00Z", "latMin": 32, "latMax": 48, "lonMin": -80, "lonMax": -58 },
+    { "name": "December 2020 nor'easter", "group": "northeast", "startIso": "2020-12-15T00:00:00Z", "endIso": "2020-12-18T00:00:00Z", "latMin": 32, "latMax": 48, "lonMin": -80, "lonMax": -58 },
+    { "name": "January 2022 bomb cyclone", "group": "northeast", "startIso": "2022-01-28T00:00:00Z", "endIso": "2022-01-31T00:00:00Z", "latMin": 32, "latMax": 50, "lonMin": -82, "lonMax": -50 },
+    { "name": "Elliott", "group": "continental", "startIso": "2022-12-21T00:00:00Z", "endIso": "2022-12-26T18:00:00Z", "latMin": 35, "latMax": 55, "lonMin": -115, "lonMax": -40 },
+    { "name": "February 2024 nor'easter", "group": "northeast", "startIso": "2024-02-12T00:00:00Z", "endIso": "2024-02-14T12:00:00Z", "latMin": 32, "latMax": 48, "lonMin": -80, "lonMax": -58 },
+    { "name": "September 2026 nor'easter", "group": "northeast", "startIso": "2026-09-25T00:00:00Z", "endIso": "2026-09-29T18:00:00Z", "latMin": 32, "latMax": 46, "lonMin": -78, "lonMax": -65 }
+  ]
+}

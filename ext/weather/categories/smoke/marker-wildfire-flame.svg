@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -2.2 2 2.35" width="180" height="210">
+  <!--
+    Edit the <symbol> below — the wildfires category loads only that block into the globe overlay.
+    Preview at the bottom matches globe appearance (same symbol, full viewBox scale).
+    Origin (0,0) = wildfire geolocation (centre of scorched ground). Flame extends upward (−y).
+    Three tongues so it reads as a fire, not a single memorial candle.
+  -->
+  <defs>
+    <symbol id="wildfire-flame-marker" viewBox="-1 -2.2 2 2.35" overflow="visible">
+      <ellipse cx="0" cy="0" rx="0.52" ry="0.11" fill="#0f0c0a" stroke="#5c5f63" stroke-width="0.05" opacity="0.55"/>
+      <g fill="var(--flame-color, #ff4d2a)" stroke="#4a4e52" stroke-opacity="0.55" stroke-width="0.1"
+         stroke-linejoin="round" stroke-linecap="round">
+        <!-- Left tongue -->
+        <path d="M -0.08,-0.02
+           C -0.42,-0.28 -0.62,-0.72 -0.48,-1.32
+           C -0.40,-1.62 -0.28,-1.72 -0.22,-1.58
+           C -0.28,-1.22 -0.18,-0.82 -0.02,-0.22
+           Z"/>
+        <!-- Right tongue -->
+        <path d="M 0.06,-0.02
+           C 0.46,-0.32 0.66,-0.78 0.50,-1.48
+           C 0.42,-1.78 0.28,-1.88 0.22,-1.72
+           C 0.32,-1.28 0.22,-0.78 0.02,-0.20
+           Z"/>
+        <!-- Center tongue (tallest) -->
+        <path d="M -0.04,-0.02
+           C -0.30,-0.42 -0.38,-0.95 -0.12,-1.78
+           C -0.04,-2.08 0.04,-2.16 0.08,-1.92
+           C 0.34,-1.05 0.28,-0.48 0.04,-0.02
+           Z"/>
+      </g>
+      <!-- Inner cores -->
+      <path fill="var(--flame-core-color, #ff9a5c)" stroke="none" opacity="0.95"
+        d="M -0.22,-0.18
+           C -0.36,-0.48 -0.38,-0.78 -0.30,-1.12
+           C -0.26,-0.78 -0.16,-0.48 -0.08,-0.22
+           Z"/>
+      <path fill="var(--flame-core-color, #ff9a5c)" stroke="none" opacity="0.95"
+        d="M 0.18,-0.18
+           C 0.34,-0.52 0.38,-0.88 0.28,-1.22
+           C 0.24,-0.88 0.16,-0.48 0.06,-0.20
+           Z"/>
+      <path fill="var(--flame-core-color, #ff9a5c)" stroke="none"
+        d="M 0,-0.12
+           C -0.12,-0.48 -0.14,-0.88 0,-1.42
+           C 0.14,-0.88 0.12,-0.48 0,-0.12
+           Z"/>
+    </symbol>
+  </defs>
+  <!-- Editor / file preview (not loaded by the app) -->
+  <rect x="-1" y="-2.2" width="2" height="2.35" fill="#fff5ee"/>
+  <use href="#wildfire-flame-marker" x="-1" y="-2.2" width="2" height="2.35"
+       style="--flame-color:#ff4d2a;--flame-core-color:#ff9a5c"/>
+</svg>

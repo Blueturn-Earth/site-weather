@@ -1,0 +1,3187 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    touch-action: none;
+    background-color:black;
+}
+
+html, body, canvas {
+  touch-action: none;
+  overscroll-behavior: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+}
+
+/* Top overlay stack (low → high): view chrome, filter, event fiche, menu corner, drag toast; menu panel when open */
+:root {
+  --z-overlay-view-chrome: 10;
+  --z-overlay-filter: 15;
+  --z-overlay-event-fiche: 19;
+  --z-overlay-menu-corner: 20;
+  --z-overlay-menu-panel: 200;
+  --z-overlay-play-flash: 450;
+  --z-overlay-drag-toast: 500;
+  /* HTML outline via 8-way + 2px shadow only. Do not use -webkit-text-stroke:
+     Samsung Internet ignores the stroke color and paints currentColor (often white). */
+  --toast-pale-green: #c5e6d4;
+  --toast-pale-red: #e8c4c4;
+  --bottom-scroller-clearance: 80px;
+  --timeline-height: 0px;
+  --timeline-width: 172px;
+  --timeline-top-inset: 8px;
+  /* 1 = normal; <1 shrinks overlay chrome in small iframes (see bt/ui_scale.js). */
+  --bt-ui-scale: 1;
+  --chrome-text-halo:
+    -1px -1px 0 #000000,
+     1px -1px 0 #000000,
+    -1px  1px 0 #000000,
+     1px  1px 0 #000000,
+    -1px 0 0 #000000,
+     1px 0 0 #000000,
+     0 -1px 0 #000000,
+     0 1px 0 #000000,
+    -2px 0 0 #000000,
+     2px 0 0 #000000,
+     0 -2px 0 #000000,
+     0 2px 0 #000000;
+}
+
+#loading-text,
+.time-bar-speed,
+.time-bar-analemma-mode,
+.speed-preset-option,
+.time-bar-date,
+.view-caption-show,
+.view-caption-title-select,
+.view-caption,
+.view-caption-toggle {
+  -webkit-text-stroke: 0;
+  -webkit-text-fill-color: currentColor;
+}
+
+#glcanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+}
+
+/*
+ * Shrink overlay chrome in compact embeds. Earth/GL stays full-bleed (no zoom).
+ * Timeline strip sizes stay in CSS px; zoom scales paint + layout together.
+ * Drag scrollers are omitted — they already size from measured (post-zoom) menu metrics.
+ */
+#appMenu,
+#oppositeTopChrome,
+#date-picker,
+#dragHintStack,
+#speedDragValueToast,
+#playPauseFlash,
+#weatherFilter,
+[data-bt-chrome-row] {
+  zoom: var(--bt-ui-scale, 1);
+}
+
+#epicEarth {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#timeBar {
+    display: none;
+}
+
+#loading-text {
+    color: darkgoldenrod;
+    font-size: calc(14px * var(--bt-ui-scale, 1));
+    font-family: Consolas, "Liberation Mono", "Courier New", monospace;
+    line-height: 1.2;
+    min-height: 1.2em;
+    pointer-events: none;
+    white-space: nowrap;
+    text-shadow: var(--chrome-text-halo);
+}
+
+#loading-text:empty {
+    display: none;
+}
+
+/* Top row opposite the hamburger: view menu (←/→ under it) → selection label. */
+.opposite-top-chrome {
+    position: fixed;
+    /* + the shift onto the hamburger's line (ui.js alignViewMenusWithHamburger). */
+    top: calc(6px + var(--opposite-top-shift, 0px));
+    z-index: var(--z-overlay-view-chrome);
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+/* Landscape: the vertical timeline (z 18, full height) lies under the view
+   menu's corner; keep the menu's controls on top (below the event fiche). */
+body.timeline-vertical .opposite-top-chrome {
+    z-index: var(--z-overlay-event-fiche);
+}
+
+/* Portrait: flush opposite the menu; extend to the hamburger corner. */
+body.timeline-horizontal .opposite-top-chrome--left,
+body:not(.timeline-vertical):not(.timeline-horizontal) .opposite-top-chrome--left {
+    left: 8px;
+    right: var(--menu-corner-size, 56px);
+    width: auto;
+    max-width: none;
+}
+
+body.timeline-horizontal .opposite-top-chrome--right,
+body:not(.timeline-vertical):not(.timeline-horizontal) .opposite-top-chrome--right {
+    left: var(--menu-corner-size, 56px);
+    right: 8px;
+    width: auto;
+    max-width: none;
+}
+
+/*
+ * Landscape: ←/→ sit on the timeline’s interior edge; row grows toward the menu.
+ * --timeline-interior-inset is the CSS px from that screen edge to the strip interior.
+ */
+body.timeline-vertical .opposite-top-chrome--left {
+    /* Zoomed (--bt-ui-scale): undo it on the screen-px inset; +8px lines up
+       with the play button (timeline.css bottom stack). */
+    left: calc(var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) + 8px);
+    right: auto;
+    width: calc(100% - var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) - 8px - 5.5rem);
+    max-width: none;
+}
+
+body.timeline-vertical .opposite-top-chrome--right {
+    left: auto;
+    right: calc(var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) + 8px);
+    width: calc(100% - var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) - 8px - 5.5rem);
+    max-width: none;
+}
+
+.opposite-top-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    pointer-events: none;
+}
+
+.opposite-top-chrome--left .opposite-top-row {
+    flex-direction: row;
+    justify-content: flex-start;
+}
+
+/* Exterior (nav) at the right edge; then view; then selection toward the interior. */
+.opposite-top-chrome--right .opposite-top-row {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+}
+
+.opposite-top-row > .selection-nav {
+    flex: 0 0 auto;
+    pointer-events: auto;
+    /* Level with the Position/Orientation selects. */
+    margin-top: 1px;
+    order: 0;
+}
+
+.opposite-top-row > #viewSideChrome {
+    flex: 0 1 auto;
+    min-width: 0;
+    order: 1;
+}
+
+.opposite-top-row > #selection-time-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    order: 2;
+    /* Select padding so the first line lines up with the menus. */
+    padding-top: 8px;
+}
+
+/* Own line under the view menus (selection_history.js), screen wide: from
+   the screen edge (or the vertical timeline's interior edge) to the other
+   edge. Negative margin: it doesn't widen the view menus' column. */
+.view-side-chrome-captions > #selection-time-text {
+    --selection-line-width: calc(100vw - 16px);
+    width: var(--selection-line-width);
+    max-width: none;
+    margin: 6px calc(-1 * var(--selection-line-width)) 0 0;
+    /* Text in line with the Position menu's (its border + padding). */
+    padding: 0 12px;
+    align-self: flex-start;
+}
+
+.view-side-chrome--right .view-side-chrome-captions > #selection-time-text {
+    margin: 6px 0 0 calc(-1 * var(--selection-line-width));
+    align-self: flex-end;
+}
+
+body.timeline-vertical .view-side-chrome-captions > #selection-time-text {
+    --selection-line-width: calc(100vw - var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) - 16px);
+}
+
+#selection-time-text {
+    box-sizing: border-box;
+    color: #ffe7c2;
+    font-size: clamp(12px, 3.2vmin, 16.8px);
+    font-family: Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size-adjust: 0.5;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: break-word;
+    min-width: 0;
+    max-width: none;
+    cursor: pointer;
+    padding: 0;
+    text-shadow: var(--chrome-text-halo);
+    position: relative;
+    z-index: 3;
+    pointer-events: auto;
+}
+
+.opposite-top-chrome--left #selection-time-text {
+    text-align: left;
+}
+
+.opposite-top-chrome--right #selection-time-text {
+    text-align: right;
+}
+
+#selection-time-text[hidden] {
+    display: none !important;
+}
+
+/* A view menu is open (ui.js setOpenViewMenu): its list goes over this line. */
+body.view-menu-open #selection-time-text {
+    visibility: hidden;
+}
+
+#selection-time-text:hover,
+#selection-time-text:focus-visible {
+    color: #fff4dc;
+}
+
+#current-time-text {
+    align-self: stretch;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.play-stack {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.play-toggle-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    cursor: pointer;
+    pointer-events: auto;
+    /* Long-press opens the speed menu: no text selection / callout. */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+    color: #e8e8e8;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    flex-shrink: 0;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.play-toggle-btn:hover,
+.play-toggle-btn:focus-visible {
+    background: rgba(0, 0, 0, 0.55);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.play-toggle-btn.is-playing {
+    color: #fff;
+    background: rgba(40, 120, 80, 0.55);
+    border-color: rgba(140, 220, 170, 0.45);
+}
+
+.play-toggle-btn.is-playing:hover,
+.play-toggle-btn.is-playing:focus-visible {
+    background: rgba(48, 140, 95, 0.65);
+    border-color: rgba(160, 230, 185, 0.55);
+}
+
+.play-toggle-icon {
+    font-size: 18px;
+    line-height: 1;
+    font-family: "Segoe UI Symbol", Consolas, monospace;
+}
+
+.analemma-cluster {
+    z-index: 3;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8px;
+    pointer-events: auto;
+    position: relative;
+}
+
+.analemma-cluster[hidden] {
+    display: none !important;
+}
+
+.analemma-cluster.is-event .analemma-caption-title {
+    color: #ffe7c2;
+}
+
+.analemma-cluster.is-event .analemma-caption-past,
+.analemma-cluster.is-event .analemma-caption-since {
+    display: none;
+}
+
+.analemma-cluster.is-bare .analemma-caption {
+    padding-bottom: calc((36px - 1.2em) / 2);
+}
+
+.analemma-controls {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.analemma-caption {
+    color: #f0f0f0;
+    font-size: 12px;
+    font-family: Consolas, "Liberation Mono", "Courier New", monospace;
+    line-height: 1.25;
+    text-shadow: var(--chrome-text-halo);
+    padding-bottom: 2px;
+}
+
+.analemma-caption-title {
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    display: inline-block;
+    transform-origin: center center;
+}
+
+.analemma-caption-preload {
+    color: darkgoldenrod;
+    font-size: 14px;
+    font-family: Consolas, "Liberation Mono", "Courier New", monospace;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-shadow: var(--chrome-text-halo);
+}
+
+.analemma-caption-preload.is-ready {
+    color: #b4f0b4;
+}
+
+.analemma-caption-past,
+.analemma-caption-since {
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+.analemma-btn {
+    all: unset;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    pointer-events: auto;
+    color: #fff;
+    background: #000;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    flex-shrink: 0;
+    --analemma-loaded-pct: 0%;
+    --analemma-playhead-pct: 0%;
+}
+
+/* Fill lives on the button itself so every pixel stays hittable. */
+.analemma-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    /* Top = origin. Gray grows down as blobs load; green grows from the
+       loaded boundary up toward the top while playing. */
+    background: linear-gradient(
+        to bottom,
+        #3d3d3d 0%,
+        #3d3d3d var(--analemma-playhead-pct),
+        #b4f0b4 var(--analemma-playhead-pct),
+        #b4f0b4 var(--analemma-loaded-pct),
+        #000 var(--analemma-loaded-pct),
+        #000 100%
+    );
+}
+
+/* Catch clicks over the fill; ::before must not punch through to the globe. */
+.analemma-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: auto;
+}
+
+.analemma-btn:disabled {
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.analemma-btn:hover,
+.analemma-btn:focus-visible {
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
+.analemma-btn.is-playing {
+    border-color: rgba(140, 220, 170, 0.45);
+}
+
+.analemma-btn.is-playing:hover,
+.analemma-btn.is-playing:focus-visible {
+    border-color: rgba(160, 230, 185, 0.55);
+}
+
+.analemma-btn.is-suggest,
+.analemma-caption-title.is-suggest {
+    animation: analemma-suggest-pulse 1.15s ease-in-out 4;
+}
+
+.analemma-btn.is-suggest-loop,
+.analemma-caption-title.is-suggest-loop {
+    animation: analemma-suggest-pulse 1.15s ease-in-out infinite;
+}
+
+@keyframes analemma-suggest-pulse {
+    0%, 100% {
+        transform: scale(1);
+        border-color: rgba(255, 255, 255, 0.28);
+    }
+    45% {
+        transform: scale(1.5);
+        border-color: rgba(180, 240, 180, 0.95);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .analemma-btn.is-suggest,
+    .analemma-btn.is-suggest-loop,
+    .analemma-caption-title.is-suggest,
+    .analemma-caption-title.is-suggest-loop {
+        animation: none;
+        border-color: rgba(180, 240, 180, 0.8);
+    }
+}
+
+.analemma-btn-icon {
+    display: flex;
+    position: relative;
+    z-index: 1;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    color: #fff;
+    pointer-events: none;
+}
+
+.analemma-btn-icon svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+}
+
+.time-bar-speed-wrap {
+    position: relative;
+    align-self: center;
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.4em;
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+.menu-hamburger-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+#appMenu.menu-corner-right .menu-hamburger-row {
+    flex-direction: row-reverse;
+}
+
+.menu-item-label {
+    position: relative;
+    display: inline-block;
+}
+
+.menu-item-label::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: auto;
+    bottom: -3px;
+    height: 2px;
+    width: calc(var(--movie-progress, 0) * 100%);
+    background: darkorange;
+    pointer-events: none;
+}
+
+.menu-item.is-movie-ready .menu-item-label::after,
+.menu-item-label.is-movie-ready::after {
+    width: 100%;
+    background: #6ee86e;
+}
+
+.menu-item:not(.is-movie-baking):not(.is-movie-ready) .menu-item-label::after {
+    width: 0;
+}
+
+.time-bar-speed {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #e8fff0;
+    font-size: 11px;
+    font-family: Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size-adjust: 0.5;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    user-select: none;
+    cursor: pointer;
+    opacity: 1;
+    transition: color 0.15s ease, opacity 0.15s ease;
+    /* Readable over a bright Moon limb (and dark space). */
+    text-shadow: var(--chrome-text-halo);
+}
+
+.time-bar-speed.is-paused {
+    color: #e0e0e0;
+    opacity: 0.92;
+}
+
+.time-bar-speed:hover,
+.time-bar-speed:focus-visible,
+.time-bar-speed.is-open {
+    color: #fff;
+    outline: none;
+}
+
+.speed-preset-menu {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 6px);
+    z-index: 25;
+    min-width: max(100%, 11.5em);
+    max-height: min(70vh, 22rem);
+    overflow-y: auto;
+    padding: 4px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(6px);
+    -webkit-overflow-scrolling: touch;
+}
+
+.speed-preset-menu[hidden] {
+    display: none !important;
+}
+
+.speed-preset-option {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #e8fff0;
+    font: 600 12px/1.25 Consolas, "Liberation Mono", "Courier New", monospace;
+    letter-spacing: 0.02em;
+    text-align: left;
+    cursor: pointer;
+    text-shadow: var(--chrome-text-halo);
+}
+
+.speed-preset-option:hover,
+.speed-preset-option:focus-visible {
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+
+.speed-preset-option.is-selected {
+    color: #fff;
+    background: rgba(40, 120, 80, 0.55);
+}
+
+.drag-hint-stack {
+    position: fixed;
+    top: var(--chrome-extension-row-top, 54px);
+    left: 8px;
+    transform: none;
+    z-index: var(--z-overlay-drag-toast);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 6px;
+    width: min(300px, 88vw);
+    max-width: min(300px, 88vw);
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+#playPauseFlash {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-overlay-play-flash);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+#playPauseFlash[hidden] {
+    display: none !important;
+}
+
+/* Centered on the Earth half while a pane is split in (same box as #topGL), not on the whole screen. */
+body.bt-split-row #playPauseFlash {
+    right: auto;
+    width: calc((1 - var(--bt-split, 0)) * 100%);
+}
+
+body.bt-split-row.bt-split-flip #playPauseFlash {
+    left: calc(var(--bt-split, 0) * 100%);
+}
+
+body.bt-split-col #playPauseFlash {
+    bottom: auto;
+    height: calc((1 - var(--bt-split, 0)) * 100%);
+}
+
+body.bt-split-col.bt-split-top #playPauseFlash {
+    top: calc(var(--bt-split, 0) * 100%);
+    bottom: 0;
+}
+
+.play-pause-flash-cluster {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+}
+
+.play-pause-flash-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(4.25rem, 20vmin, 7.5rem);
+    height: clamp(4.25rem, 20vmin, 7.5rem);
+    border-radius: 50%;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.38);
+}
+
+.play-pause-flash-icon svg {
+    display: block;
+    width: clamp(2.4rem, 11.3vmin, 4.25rem);
+    height: clamp(2.4rem, 11.3vmin, 4.25rem);
+}
+
+.play-pause-flash-cluster.is-animating {
+    animation: play-pause-flash 1.5s ease-out forwards;
+}
+
+.play-pause-flash-cluster.is-animating.is-play {
+    animation: play-pause-flash-play 2.6s ease-out forwards;
+}
+
+@keyframes play-pause-flash {
+    0% {
+        opacity: 0.55;
+        transform: scale(0.82);
+    }
+    22% {
+        opacity: 1;
+        transform: scale(1.16);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.28);
+    }
+}
+
+@keyframes play-pause-flash-play {
+    0% {
+        opacity: 0.55;
+        transform: scale(0.82);
+    }
+    12% {
+        opacity: 1;
+        transform: scale(1.16);
+    }
+    58% {
+        opacity: 1;
+        transform: scale(1.16);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.24);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .play-pause-flash-cluster.is-animating {
+        animation: play-pause-flash-static 1.4s ease-out forwards;
+    }
+
+    .play-pause-flash-cluster.is-animating.is-play {
+        animation: play-pause-flash-static-play 2.5s ease-out forwards;
+    }
+
+    @keyframes play-pause-flash-static {
+        0%, 30% { opacity: 1; transform: none; }
+        100% { opacity: 0; transform: none; }
+    }
+
+    @keyframes play-pause-flash-static-play {
+        0%, 55% { opacity: 1; transform: none; }
+        100% { opacity: 0; transform: none; }
+    }
+}
+
+.speed-drag-toast {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    z-index: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 5px 10px 4px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(126, 184, 160, 0.45);
+    color: #b8e0ce;
+    font-size: 11px;
+    font-family: Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size-adjust: 0.5;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    user-select: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+
+/* Coaching hints — light enough to read over the globe without masking chrome. */
+.speed-drag-toast.is-hint {
+    background: rgba(0, 0, 0, 0.38);
+    border-color: rgba(126, 184, 160, 0.38);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+/* Active vertical drag — opaque so filter / chrome cannot show through. */
+.speed-drag-toast.is-drag {
+    background: rgba(0, 0, 0, 0.9);
+    border-color: rgba(126, 184, 160, 0.62);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+
+.speed-drag-toast-lines {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+}
+
+.speed-drag-toast-main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+}
+
+.speed-drag-toast-hide {
+    all: unset;
+    box-sizing: border-box;
+    display: none;
+    pointer-events: auto;
+    cursor: pointer;
+    padding: 1px 8px;
+    border-radius: 4px;
+    color: rgba(184, 224, 206, 0.7);
+    font: 600 10px/1.2 system-ui, sans-serif;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+}
+
+.speed-drag-toast.is-hint .speed-drag-toast-hide {
+    display: inline-block;
+}
+
+.speed-drag-toast-hide:hover,
+.speed-drag-toast-hide:focus-visible {
+    color: #e8fff4;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.speed-drag-toast[hidden] {
+    display: none !important;
+}
+
+.speed-drag-toast.is-fading {
+    opacity: 0;
+}
+
+.view-side-chrome {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    z-index: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: min(28rem, 100%);
+    pointer-events: none;
+}
+
+/* Caption column alignment follows the opposite-menu side. */
+.view-side-chrome--left {
+    flex-direction: row;
+}
+
+.view-side-chrome--right {
+    flex-direction: row-reverse;
+}
+
+.view-side-chrome-captions {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: min(28rem, 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    pointer-events: none;
+}
+
+.view-caption-select-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 8px;
+    max-width: 100%;
+    pointer-events: none;
+}
+
+.view-side-chrome--right .view-caption-select-row {
+    flex-direction: row-reverse;
+}
+
+/* Menus keep their own width: not stretched to the view info text below. */
+.view-side-chrome-captions > .view-caption-select-row {
+    align-self: flex-start;
+}
+
+.view-side-chrome--right .view-side-chrome-captions > .view-caption-select-row {
+    align-self: flex-end;
+}
+
+.view-caption-select-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+    flex: 1 1 auto;
+    min-width: 0;
+    pointer-events: auto;
+    margin: 0;
+    max-width: 100%;
+}
+
+.view-caption-orient-wrap {
+    flex: 0 1 7.2rem;
+}
+
+/* Restore link — only while captions are off and the view menu is open. */
+.view-caption-show {
+    all: unset;
+    box-sizing: border-box;
+    display: none;
+    flex: 0 0 auto;
+    align-self: flex-end;
+    pointer-events: auto;
+    cursor: pointer;
+    padding: 10px 0;
+    color: rgba(184, 224, 206, 0.95);
+    font: 600 10px/1.2 "Segoe UI", system-ui, sans-serif;
+    text-decoration: underline;
+    white-space: nowrap;
+    text-shadow: var(--chrome-text-halo);
+}
+
+.view-captions-hidden .view-caption-select-row.is-menu-open .view-caption-show {
+    display: inline-block;
+}
+
+/* Under the other view menu (ui.js setOpenViewMenu), out of the flow so
+   the menus don't move. */
+.view-caption-select-wrap:has(> .view-caption-show) {
+    position: relative;
+}
+
+.view-caption-select-wrap > .view-caption-show {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    padding: 6px 2px;
+}
+
+.view-side-chrome--right .view-caption-select-wrap > .view-caption-show {
+    left: auto;
+    right: 0;
+}
+
+.view-caption-show:hover,
+.view-caption-show:focus-visible {
+    color: #e8fff4;
+    outline: none;
+}
+
+.view-caption-shortcut {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    min-width: 5.9rem;
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.42);
+    color: rgba(184, 224, 206, 0.95);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    pointer-events: auto;
+    text-shadow: var(--chrome-text-halo);
+}
+
+.view-caption-shortcut:hover,
+.view-caption-shortcut:focus-visible {
+    background-color: rgba(0, 0, 0, 0.55);
+    border-color: rgba(255, 255, 255, 0.22);
+    outline: none;
+}
+
+.view-caption-title-select {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 8px 28px 8px 11px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.42)
+      url("images/icons/chevron-down.svg")
+      no-repeat right 10px center;
+    appearance: none;
+    -webkit-appearance: none;
+    color: rgba(184, 224, 206, 0.95);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    color-scheme: dark;
+    text-shadow: var(--chrome-text-halo);
+}
+
+.view-side-chrome--right .view-caption-title-select {
+    text-align: right;
+    padding: 8px 11px 8px 28px;
+    background-position: left 10px center;
+}
+
+.view-caption-title-select:hover,
+.view-caption-title-select:focus-visible {
+    background-color: rgba(0, 0, 0, 0.55);
+    border-color: rgba(255, 255, 255, 0.22);
+    outline: none;
+}
+
+.view-caption-title-select option {
+    background: #1a1a1a;
+    color: #e8e8e8;
+    text-transform: uppercase;
+}
+
+.view-caption {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    z-index: 5;
+    max-width: 100%;
+    margin-top: 2px;
+    /* Match select text inset (1px border + 11px padding), not the menu frame. */
+    padding: 2px 12px 0;
+    border-radius: 0;
+    background: transparent;
+    border: 0;
+    color: rgba(220, 220, 220, 0.88);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    pointer-events: auto;
+    cursor: pointer;
+    user-select: none;
+    text-shadow: var(--chrome-text-halo);
+}
+
+.view-side-chrome--right .view-caption,
+.view-side-chrome--right .view-caption-analemma-mode {
+    text-align: right;
+}
+
+.view-caption:hover,
+.view-caption:focus-visible {
+    background: transparent;
+    border: 0;
+    outline: none;
+}
+
+.view-caption:hover .view-caption-body,
+.view-caption:focus-visible .view-caption-body {
+    color: rgba(235, 235, 235, 0.98);
+}
+
+.view-caption[hidden] {
+    display: none !important;
+}
+
+/* Captions off: keep the shared view dropdown; hide body panels + hide link. */
+.view-captions-hidden .view-caption,
+.view-captions-hidden .view-caption-toggle,
+.view-captions-hidden .view-caption-analemma-mode {
+    display: none !important;
+}
+
+.view-caption-body {
+    font-size: 11px;
+    line-height: 1.35;
+    color: rgba(210, 210, 210, 0.88);
+}
+
+.view-caption-orient {
+    margin-top: 8px;
+}
+
+.view-caption-analemma-mode {
+    margin-top: 8px;
+    padding: 0 12px;
+}
+
+.view-caption-analemma-mode[hidden] {
+    display: none !important;
+}
+
+.view-caption-bm-note {
+    margin-top: 6px;
+    color: darkgoldenrod;
+    font-size: 10px;
+    line-height: 1.35;
+    font-family: Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.view-caption-bm-note[hidden] {
+    display: none !important;
+}
+
+.view-caption-toggle {
+    margin-top: 4px;
+    padding: 0 12px;
+    align-self: flex-start;
+    border: 0;
+    background: transparent;
+    color: rgba(184, 224, 206, 0.95);
+    font: inherit;
+    font-size: 10px;
+    text-decoration: underline;
+    cursor: pointer;
+    pointer-events: auto;
+    text-shadow: var(--chrome-text-halo);
+}
+
+.view-side-chrome--right .view-caption-toggle {
+    align-self: flex-end;
+    text-align: right;
+}
+
+.view-caption-toggle:hover,
+.view-caption-toggle:focus-visible {
+    color: #e8fff4;
+    outline: none;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.speed-drag-arrows {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    line-height: 1;
+    font-size: 11px;
+    flex: 0 0 auto;
+}
+
+.speed-drag-arrow {
+    opacity: 0.45;
+    color: #9ecbb8;
+    transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease;
+    animation: speed-drag-hint 1.1s ease-in-out infinite;
+}
+
+.speed-drag-arrow.up {
+    animation-name: speed-drag-hint-up;
+}
+
+.speed-drag-arrow.down {
+    animation-name: speed-drag-hint-down;
+    animation-delay: 0.55s;
+}
+
+.speed-drag-toast.is-up .speed-drag-arrow.up,
+.speed-drag-toast.is-down .speed-drag-arrow.down {
+    opacity: 1;
+    color: #e8fff4;
+    animation-duration: 0.55s;
+}
+
+.speed-drag-toast.is-up .speed-drag-arrow.up {
+    animation-name: speed-drag-nudge-up;
+    animation-delay: 0s;
+}
+
+.speed-drag-toast.is-down .speed-drag-arrow.down {
+    animation-name: speed-drag-nudge-down;
+    animation-delay: 0s;
+}
+
+.speed-drag-toast.is-up .speed-drag-arrow.down,
+.speed-drag-toast.is-down .speed-drag-arrow.up {
+    opacity: 0.22;
+    animation: none;
+}
+
+/* Both arrows pulse while the persistent drag hint is shown */
+.speed-drag-toast.is-hint .speed-drag-arrow {
+    opacity: 0.55;
+    color: #b8e0ce;
+}
+
+.speed-drag-toast.is-hint .speed-drag-arrow.up {
+    animation: speed-drag-hint-up 1.1s ease-in-out infinite;
+}
+
+.speed-drag-toast.is-hint .speed-drag-arrow.down {
+    animation: speed-drag-hint-down 1.1s ease-in-out infinite;
+    animation-delay: 0.55s;
+}
+
+.speed-drag-arrows-x,
+.speed-drag-arrows-hint-x {
+    flex-direction: row;
+    gap: 3px;
+    min-width: 1.4em;
+}
+
+.speed-drag-toast.is-hint .speed-drag-arrow.left {
+    animation: speed-drag-hint-left 1.1s ease-in-out infinite;
+}
+
+.speed-drag-toast.is-hint .speed-drag-arrow.right {
+    animation: speed-drag-hint-right 1.1s ease-in-out infinite;
+    animation-delay: 0.55s;
+}
+
+.speed-drag-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    line-height: 1.25;
+    box-sizing: border-box;
+    width: auto;
+    white-space: nowrap;
+    text-align: center;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.speed-drag-value-toast {
+    position: fixed;
+    z-index: var(--z-overlay-drag-toast);
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    box-sizing: border-box;
+    max-width: min(86vw, 22rem);
+    padding: 8px 16px 8px 12px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.9);
+    border: 1px solid rgba(126, 184, 160, 0.62);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65);
+    color: var(--toast-pale-green);
+    pointer-events: none;
+    user-select: none;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+
+.speed-drag-value-title:empty {
+    display: none;
+}
+
+.speed-drag-value-title {
+    font: 600 12px/1.25 "Segoe UI", system-ui, sans-serif;
+    letter-spacing: 0.01em;
+    text-align: center;
+    color: var(--toast-pale-green);
+    text-shadow: var(--chrome-text-halo);
+    white-space: nowrap;
+}
+
+.speed-drag-value-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.speed-drag-value-label {
+    min-width: 0;
+    font: 600 clamp(15px, 4.4vmin, 19px)/1.25 Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size-adjust: 0.5;
+    letter-spacing: 0.02em;
+    text-align: center;
+    color: var(--toast-pale-green);
+    text-shadow: var(--chrome-text-halo);
+    white-space: nowrap;
+}
+
+.speed-drag-value-tod {
+    color: var(--toast-pale-red);
+}
+
+.speed-drag-value-toast .speed-drag-arrows {
+    font-size: clamp(13px, 3.6vmin, 16px);
+}
+
+.speed-drag-value-toast .speed-drag-arrow {
+    opacity: 0.55;
+    color: var(--toast-pale-green);
+}
+
+.speed-drag-value-toast .speed-drag-arrow.up {
+    animation: speed-drag-hint-up 1.1s ease-in-out infinite;
+}
+
+.speed-drag-value-toast .speed-drag-arrow.down {
+    animation: speed-drag-hint-down 1.1s ease-in-out infinite;
+    animation-delay: 0.55s;
+}
+
+.speed-drag-value-toast.is-up .speed-drag-arrow.up,
+.speed-drag-value-toast.is-down .speed-drag-arrow.down {
+    opacity: 1;
+    color: var(--toast-pale-green);
+    animation-duration: 0.45s;
+}
+
+.speed-drag-value-toast.is-up .speed-drag-arrow.up {
+    animation-name: speed-drag-nudge-up;
+    animation-delay: 0s;
+}
+
+.speed-drag-value-toast.is-down .speed-drag-arrow.down {
+    animation-name: speed-drag-nudge-down;
+    animation-delay: 0s;
+}
+
+.speed-drag-value-toast.is-up .speed-drag-arrow.down,
+.speed-drag-value-toast.is-down .speed-drag-arrow.up {
+    opacity: 0.22;
+    animation: none;
+}
+
+.speed-drag-value-toast .speed-drag-arrow.left {
+    animation: speed-drag-hint-left 1.1s ease-in-out infinite;
+}
+
+.speed-drag-value-toast .speed-drag-arrow.right {
+    animation: speed-drag-hint-right 1.1s ease-in-out infinite;
+    animation-delay: 0.55s;
+}
+
+.speed-drag-value-toast.is-left .speed-drag-arrow.left,
+.speed-drag-value-toast.is-right .speed-drag-arrow.right {
+    opacity: 1;
+    color: var(--toast-pale-green);
+    animation-duration: 0.45s;
+}
+
+.speed-drag-value-toast.is-left .speed-drag-arrow.left {
+    animation-name: speed-drag-nudge-left;
+    animation-delay: 0s;
+}
+
+.speed-drag-value-toast.is-right .speed-drag-arrow.right {
+    animation-name: speed-drag-nudge-right;
+    animation-delay: 0s;
+}
+
+.speed-drag-value-toast.is-left .speed-drag-arrow.right,
+.speed-drag-value-toast.is-right .speed-drag-arrow.left {
+    opacity: 0.22;
+    animation: none;
+}
+
+.speed-drag-value-toast[hidden] {
+    display: none !important;
+}
+
+.speed-drag-value-toast.is-fading {
+    opacity: 0;
+}
+
+@keyframes speed-drag-hint-up {
+    0%, 100% { transform: translateY(0); opacity: 0.4; }
+    50% { transform: translateY(-4px); opacity: 0.85; }
+}
+
+@keyframes speed-drag-hint-down {
+    0%, 100% { transform: translateY(0); opacity: 0.4; }
+    50% { transform: translateY(4px); opacity: 0.85; }
+}
+
+@keyframes speed-drag-nudge-up {
+    0%, 100% { transform: translateY(0); opacity: 1; }
+    50% { transform: translateY(-7px); opacity: 0.7; }
+}
+
+@keyframes speed-drag-nudge-down {
+    0%, 100% { transform: translateY(0); opacity: 1; }
+    50% { transform: translateY(7px); opacity: 0.7; }
+}
+
+@keyframes speed-drag-hint-left {
+    0%, 100% { transform: translateX(0); opacity: 0.4; }
+    50% { transform: translateX(-4px); opacity: 0.85; }
+}
+
+@keyframes speed-drag-hint-right {
+    0%, 100% { transform: translateX(0); opacity: 0.4; }
+    50% { transform: translateX(4px); opacity: 0.85; }
+}
+
+@keyframes speed-drag-nudge-left {
+    0%, 100% { transform: translateX(0); opacity: 1; }
+    50% { transform: translateX(-7px); opacity: 0.7; }
+}
+
+@keyframes speed-drag-nudge-right {
+    0%, 100% { transform: translateX(0); opacity: 1; }
+    50% { transform: translateX(7px); opacity: 0.7; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .speed-drag-arrow,
+    .speed-drag-toast.is-up .speed-drag-arrow.up,
+    .speed-drag-toast.is-down .speed-drag-arrow.down,
+    .speed-drag-value-toast .speed-drag-arrow,
+    .speed-drag-value-toast.is-up .speed-drag-arrow.up,
+    .speed-drag-value-toast.is-down .speed-drag-arrow.down,
+    .speed-drag-value-toast.is-left .speed-drag-arrow.left,
+    .speed-drag-value-toast.is-right .speed-drag-arrow.right {
+        animation: none;
+    }
+}
+
+/* Status line above the date / time (app.js renderTimeBar): Loading / other
+   status (gold), Missing EPIC imagery (red), else the imagery credit (dim). */
+.time-bar-status {
+    display: block;
+    font-size: 0.85em;
+}
+
+.time-bar-status.is-loading {
+    color: darkgoldenrod;
+}
+
+.time-bar-status.is-missing {
+    color: #ff5a4f;
+}
+
+.time-bar-status.is-credit {
+    opacity: 0.75;
+}
+
+/* Credits colored like their timeline dots (timeline_epic/addon.js):
+   NASA EPIC blue, cloud maps (clouds/live_clouds.js) pale magenta. */
+.time-bar-status.is-credit,
+#current-time-text .now-images-credit {
+    color: rgb(140, 190, 255);
+}
+
+.time-bar-status.is-credit.is-clouds-credit,
+#current-time-text .now-images-credit.is-clouds-credit {
+    color: rgb(240, 160, 230);
+}
+
+#current-time-text,
+.time-bar-date {
+    color: #fff;
+    /* Consolas + size-adjust: Courier New reads much larger in Firefox than Chrome. */
+    /* From the base size up to `--bt-date-scale` times it, by the width the date has (`100cqw`: its box in the
+       timeline, 11.5 em for its longest line, the credit); at the base size it wraps. */
+    font-size: clamp(calc(12.6px * 0.69), calc(100cqw / 11.5 * 0.8625), calc(12.6px * 0.69 * var(--bt-date-scale, 2)));
+    font-family: Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size-adjust: 0.5;
+    white-space: normal;
+    overflow: hidden;
+    overflow-wrap: break-word;
+    min-width: 0;
+    max-width: 100%;
+    cursor: pointer;
+    line-height: 1.2;
+    padding: 0 0 2px;
+    /* Sharp black outline so glyphs stay readable on sunlit Earth. */
+    text-shadow: var(--chrome-text-halo);
+}
+
+.time-bar-date:hover,
+.time-bar-date:focus-visible {
+    color: #fff;
+}
+
+#date-picker {
+    position: fixed;
+    bottom: 20px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#date-picker.time-corner-left {
+    left: 20px;
+    right: auto;
+}
+
+#date-picker.time-corner-right {
+    right: 20px;
+    left: auto;
+}
+
+/* Globe / overlays that stay visible while chrome is idle. */
+#topGL {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+}
+
+/*
+ * All UI — base chrome and every extension.
+ * Contemplation idle fades this one element; gfx stays in #topGL.
+ */
+#topUI {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+}
+
+/* Contemplation mode: fade all chrome UI; globe overlays stay. */
+.chrome-autohide {
+    transition: opacity 0.65s ease;
+}
+
+body.chrome-idle #topUI.chrome-autohide,
+body.chrome-idle .chrome-autohide {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Timeline stays hittable while faded — wheel changes speed; strip already blocks globe zoom. */
+body.chrome-idle #topUI #epicTimeline,
+body.chrome-idle #epicTimeline.chrome-autohide {
+    pointer-events: auto !important;
+}
+
+/* Wake-from-idle gesture: visible again but not clickable until that click is eaten. */
+body.chrome-waking #topUI.chrome-autohide,
+body.chrome-waking .chrome-autohide {
+    pointer-events: none !important;
+}
+
+body.chrome-waking #topUI #epicTimeline,
+body.chrome-waking #epicTimeline.chrome-autohide {
+    pointer-events: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chrome-autohide {
+        transition: opacity 0.15s ease;
+    }
+}
+
+[hidden] {
+  display: none !important;
+}
+
+:root {
+  --menu-icon-size: 30px;
+  --menu-corner-size: 56px;
+  --menu-corner-height: 56px;
+  --dppx: 1;
+}
+
+#appMenu {
+    position: fixed;
+    top: 0;
+    z-index: var(--z-overlay-menu-corner);
+    padding: 8px;
+    opacity: 1;
+    pointer-events: none;
+}
+
+/* Corner column: only its controls take clicks, not its box (the hamburger
+   row with ←/→ is wider than the toggles under it; that empty part lies over
+   the extension rows, e.g. the filter bar). */
+#appMenu .corner-control > *,
+#appMenu .menu-panel,
+#appMenu .menu-submenu,
+#appMenu .ext-quick-switch {
+    pointer-events: auto;
+}
+
+#appMenu:has(.menu-panel:not([hidden])),
+#appMenu:has(.menu-submenu:not([hidden])),
+#appMenu:has(#extQuickSwitch:not([hidden])) {
+    z-index: var(--z-overlay-menu-panel);
+}
+
+#appMenu.menu-corner-right {
+    right: 0;
+    left: auto;
+}
+
+#appMenu.menu-corner-left {
+    left: 0;
+    right: auto;
+}
+
+#menuButton {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    color: white;
+}
+
+#menuButton img {
+    width: 30px;
+    height: 30px;
+    display: block;
+}
+
+#menuButton.has-profile img {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Last exclusive extension — on/off; icon only (active/inactive art in SVG) */
+.ext-quick-toggle {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    cursor: pointer;
+    color: white;
+    opacity: 0.9;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+}
+
+.ext-quick-toggle:hover,
+.ext-quick-toggle:focus-visible {
+    opacity: 1;
+}
+
+.ext-quick-toggle img {
+    width: 22px;
+    height: 22px;
+    display: block;
+    pointer-events: none;
+}
+
+.ext-quick-toggle.is-coach-pulse {
+    animation: ext-activation-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ext-activation-pulse {
+    0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 0 rgba(120, 200, 255, 0));
+    }
+    50% {
+        transform: scale(1.1);
+        filter: drop-shadow(0 0 10px rgba(120, 200, 255, 0.65));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ext-quick-toggle.is-coach-pulse {
+        animation: none;
+        outline: 2px solid rgba(120, 200, 255, 0.85);
+        outline-offset: 2px;
+    }
+}
+
+.ext-activation-hint {
+    position: fixed;
+    z-index: 25;
+    max-width: min(240px, calc(100vw - 24px));
+    padding: 8px 12px;
+    font-size: 13px;
+    line-height: 1.35;
+    color: #fff;
+    background: rgba(12, 22, 36, 0.92);
+    border: 1px solid rgba(120, 200, 255, 0.4);
+    border-radius: 10px;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    white-space: normal;
+    animation: ext-activation-hint-bounce 1.35s ease-in-out infinite;
+    transform-origin: center top;
+}
+
+/* extension_host.setExtensionStatus: e.g. "Loading sky pics..." beside the toggle. */
+.ext-status-label {
+    position: fixed;
+    z-index: 25;
+    transform: translateY(-50%);
+    padding: 4px 10px;
+    font-size: 13px;
+    line-height: 1.3;
+    color: yellow;
+    background: rgba(12, 22, 36, 0.85);
+    border-radius: 8px;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.ext-status-label[hidden] {
+    display: none !important;
+}
+
+.ext-activation-hint[hidden] {
+    display: none !important;
+}
+
+@keyframes ext-activation-hint-bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    55% {
+        transform: translateY(-2px);
+    }
+    70% {
+        transform: translateY(-8px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ext-activation-hint {
+        animation: none;
+    }
+}
+
+.ext-quick-switch {
+    position: absolute;
+    top: 100%;
+    margin-top: 4px;
+    width: 11.25rem;
+    min-width: 11.25rem;
+    max-width: 11.25rem;
+    padding: 4px 0;
+    background: rgba(20, 20, 20, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    z-index: 1;
+}
+
+#appMenu.menu-corner-right .ext-quick-switch {
+    right: 0;
+    left: auto;
+}
+
+#appMenu.menu-corner-left .ext-quick-switch {
+    left: 0;
+    right: auto;
+}
+
+.ext-quick-switch[hidden] {
+    display: none !important;
+}
+
+.ext-quick-switch .menu-ext-choice {
+    padding: 8px 10px;
+    gap: 8px;
+    align-items: center;
+}
+
+.ext-quick-switch .menu-ext-choice-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: pre-line;
+    overflow-wrap: normal;
+    word-break: normal;
+    line-height: 1.15;
+}
+
+/* Presence: emoji eye under the extension toggle (non-localised only) */
+.love-corner-eye-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 34px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: white;
+    opacity: 0.95;
+    background: rgba(36, 18, 32, 0.72);
+    border: 1px solid rgba(255, 182, 210, 0.45);
+    transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    touch-action: none;
+    pointer-events: auto;
+}
+
+.love-corner-eye-btn[hidden] {
+    display: none !important;
+}
+
+.love-corner-eye-btn:hover,
+.love-corner-eye-btn:focus-visible {
+    background: rgba(55, 28, 45, 0.95);
+    border-color: rgba(255, 200, 220, 0.85);
+}
+
+.love-corner-eye-btn .love-corner-eye {
+    display: block;
+    pointer-events: none;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
+
+.love-corner-eye-btn.is-coach-pulse {
+    animation: love-coach-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes love-coach-pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 182, 210, 0.45);
+    }
+    50% {
+        transform: scale(1.08);
+        box-shadow: 0 0 0 8px rgba(255, 182, 210, 0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .love-corner-eye-btn.is-coach-pulse {
+        animation: none;
+        outline: 2px solid rgba(255, 200, 220, 0.85);
+    }
+}
+
+/* Selection history ←/→ left of the selected-event label (timeline chrome). */
+.selection-nav {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.selection-nav[hidden] {
+    display: none !important;
+}
+
+/* Under the view menus (selection_history.js), flush with the screen-edge side. */
+.view-side-chrome-captions > .selection-nav {
+    align-self: flex-start;
+    margin-top: 6px;
+    pointer-events: auto;
+}
+
+.view-side-chrome--right .view-side-chrome-captions > .selection-nav {
+    align-self: flex-end;
+}
+
+/* Beside the hamburger (selection_history.js): list opens toward the interior. */
+#appMenu.menu-corner-right .selection-history-menu {
+    left: auto;
+    right: 0;
+}
+
+.view-side-chrome--right .selection-history-menu {
+    left: auto;
+    right: 0;
+}
+
+.selection-nav-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #ffe7c2;
+    font-size: 16px;
+    font-family: Consolas, "Liberation Mono", "Courier New", monospace;
+    line-height: 1;
+    background: rgba(36, 28, 18, 0.72);
+    border: 1px solid rgba(255, 220, 170, 0.45);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+}
+
+.selection-history-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    min-width: max(100%, 12em);
+    max-width: min(72vw, 22rem);
+    max-height: min(50vh, 18rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 4px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.82);
+    border: 1px solid rgba(255, 220, 170, 0.35);
+    backdrop-filter: blur(6px);
+    -webkit-overflow-scrolling: touch;
+    pointer-events: auto;
+}
+
+.selection-history-menu.is-forth {
+    left: auto;
+    right: 0;
+}
+
+.selection-history-menu[hidden] {
+    display: none !important;
+}
+
+.selection-history-option {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #ffe7c2;
+    font: 600 12px/1.3 Consolas, "Liberation Mono", "Courier New", monospace;
+    letter-spacing: 0.01em;
+    text-align: left;
+    cursor: pointer;
+    text-shadow: var(--chrome-text-halo);
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+.selection-history-option:hover,
+.selection-history-option:focus-visible {
+    background: rgba(255, 220, 170, 0.14);
+    outline: none;
+}
+
+.selection-nav-btn:hover,
+.selection-nav-btn:focus-visible {
+    background: rgba(55, 42, 28, 0.95);
+    border-color: rgba(255, 235, 200, 0.85);
+    color: #fff4dc;
+}
+
+.selection-nav-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+    pointer-events: none;
+}
+
+.corner-control {
+    display: flex;
+    /* DOM order is [toggle…, menu]; reverse so menu stays on top, toggle under */
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+#appMenu.menu-corner-left .corner-control {
+    align-items: flex-start;
+}
+
+.corner-hover-label {
+    display: none;
+}
+
+.menu-panel {
+    position: absolute;
+    top: 0;
+    min-width: 140px;
+    background: rgba(20, 20, 20, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+#appMenu.menu-corner-right .menu-panel {
+    right: 0;
+    left: auto;
+}
+
+#appMenu.menu-corner-left .menu-panel {
+    left: 0;
+    right: auto;
+}
+
+.menu-item {
+    all: unset;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 12px 16px;
+    color: lightgray;
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    cursor: pointer;
+    text-align: left;
+}
+
+#appMenu.menu-corner-left .menu-item {
+    flex-direction: row;
+    text-align: left;
+}
+
+#appMenu.menu-corner-right .menu-item {
+    flex-direction: row-reverse;
+    text-align: right;
+}
+
+.menu-item[hidden] {
+    display: none !important;
+}
+
+.menu-item-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: block;
+}
+
+.menu-item-icon.is-profile {
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+}
+
+.menu-extensions-wrap {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+#menuExtensions .menu-item-chevron {
+    margin-inline-start: auto;
+    opacity: 0.55;
+    font-size: 14px;
+}
+
+#appMenu.menu-corner-right #menuExtensions .menu-item-chevron {
+    margin-inline-start: 0;
+    margin-inline-end: auto;
+}
+
+.menu-submenu {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 4px 0 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.menu-submenu[hidden] {
+    display: none !important;
+}
+
+.menu-ext-choice {
+    padding-left: 22px;
+    padding-right: 22px;
+    font-size: 15px;
+}
+
+#appMenu.menu-corner-right .menu-ext-choice {
+    padding-left: 22px;
+    padding-right: 22px;
+}
+
+.menu-ext-choice.is-active {
+    color: white;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.menu-ext-choice-mark {
+    min-width: 1em;
+    text-align: center;
+    opacity: 0.9;
+}
+
+.about-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    /* #topUI is pointer-events:none so empty chrome does not steal globe hits. */
+    pointer-events: auto;
+}
+
+.about-panel[hidden] {
+    display: none;
+}
+
+.about-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+}
+
+.about-dialog {
+    position: relative;
+    max-width: 360px;
+    width: 100%;
+    padding: 28px 24px 24px;
+    background: rgba(18, 18, 18, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    color: lightgray;
+    text-align: center;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.about-close {
+    all: unset;
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    font-size: 28px;
+    line-height: 32px;
+    color: gray;
+    cursor: pointer;
+    text-align: center;
+}
+
+.about-close:hover,
+.about-close:focus-visible {
+    color: white;
+}
+
+.about-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.about-pe-logo {
+    width: 64px;
+    height: 64px;
+    display: block;
+}
+
+.about-brand h1 {
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 20px;
+    font-weight: normal;
+    color: white;
+}
+
+.about-version {
+    margin: 0 0 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: darkgoldenrod;
+}
+
+.about-summary {
+    margin: 0 0 24px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    color: lightgray;
+}
+
+.about-summary p {
+    margin: 0 0 0.75em;
+}
+
+.about-summary p:last-child {
+    margin-bottom: 0;
+}
+
+.about-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+}
+
+.about-link img {
+    height: 40px;
+    width: auto;
+    display: block;
+    opacity: 0.85;
+    transition: opacity 0.2s ease;
+}
+
+.about-link:hover img,
+.about-link:focus-visible img {
+    opacity: 1;
+}
+
+.about-paper {
+    margin: 16px 0 18px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    text-align: center;
+}
+
+.about-summary a,
+.about-paper a {
+    color: #9ec9ff;
+    text-decoration: none;
+}
+
+.about-summary a:hover,
+.about-summary a:focus-visible,
+.about-paper a:hover,
+.about-paper a:focus-visible {
+    text-decoration: underline;
+}
+
+.about-contact {
+    margin: 20px 0 0;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    text-align: center;
+}
+
+.about-contact a {
+    color: #9ec9ff;
+    text-decoration: none;
+}
+
+.about-contact a:hover,
+.about-contact a:focus-visible {
+    text-decoration: underline;
+}
+
+.help-dialog {
+    max-width: 420px;
+    max-height: min(86vh, 640px);
+    overflow: auto;
+    text-align: left;
+}
+
+.help-body {
+    margin-top: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    color: lightgray;
+}
+
+.wallpaper-dialog {
+    max-width: 420px;
+    max-height: min(86vh, 640px);
+    overflow: auto;
+    text-align: left;
+}
+
+.wallpaper-body {
+    margin: 8px 0 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    color: lightgray;
+}
+
+.wallpaper-body p,
+.wallpaper-other-body p {
+    margin: 0 0 0.75em;
+}
+
+.wallpaper-body p:last-child,
+.wallpaper-other-section p:last-child {
+    margin-bottom: 0;
+}
+
+.wallpaper-platform-title {
+    margin: 0 0 0.5em;
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    font-weight: normal;
+    color: white;
+}
+
+.wallpaper-note {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
+}
+
+.wallpaper-url-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0 0 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.wallpaper-url-text {
+    display: block;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    color: darkgoldenrod;
+    word-break: break-all;
+    user-select: all;
+}
+
+.wallpaper-url-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.movie-clip-dialog {
+    max-width: 400px;
+    text-align: left;
+}
+
+.movie-clip-row {
+    margin: 0;
+    padding: 0;
+}
+
+.movie-clip-row[hidden] {
+    display: none !important;
+}
+
+.movie-clip-row-title {
+    margin: 0 0 0.45em;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.movie-clip-props {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 1em;
+    row-gap: 0.2em;
+    margin: 0 0 0.55em;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    color: lightgray;
+}
+
+.movie-clip-props dt {
+    margin: 0;
+    color: #999;
+}
+
+.movie-clip-props dd {
+    margin: 0;
+    min-width: 0;
+}
+
+.movie-clip-bake-track {
+    --movie-progress: 0;
+    position: relative;
+    overflow: hidden;
+    height: 8px;
+    margin: 0 0 0.55em;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.movie-clip-bake-fill {
+    display: block;
+    height: 100%;
+    width: calc(var(--movie-progress, 0) * 100%);
+    background: darkorange;
+}
+
+.movie-clip-progress-props {
+    margin-bottom: 0.7em;
+}
+
+.movie-clip-estimate,
+.movie-clip-progress,
+.movie-clip-error {
+    margin: 0 0 0.55em;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    color: lightgray;
+}
+
+.movie-clip-estimate,
+.movie-clip-progress {
+    color: #bbb;
+    font-size: 12px;
+}
+
+.movie-clip-error {
+    color: #f0a0a0;
+}
+
+.movie-clip-error[hidden] {
+    display: none !important;
+}
+
+.movie-clip-range-cell {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.movie-clip-range-cell select,
+.movie-clip-range-cell input[type="date"],
+.movie-clip-range-cell input[type="time"] {
+    box-sizing: border-box;
+    width: 100%;
+    margin: -2px 0;
+    padding: 1px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 4px;
+    background: #111;
+    color: #eee;
+    font: inherit;
+    line-height: 1.3;
+    color-scheme: dark;
+}
+
+.movie-clip-range-cell #movieClipTimeCell {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    min-width: 0;
+    width: 100%;
+}
+
+.movie-clip-utc {
+    flex: 0 0 auto;
+    color: #999;
+}
+
+.movie-clip-notify {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0.4em 0 0.7em;
+    color: #ddd;
+    font-size: 13px;
+}
+
+.movie-clip-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.movie-clip-actions .settings-action {
+    width: auto;
+    flex: 1 1 8em;
+}
+
+.movie-clip-start {
+    color: white;
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.wallpaper-copy-status {
+    margin: 0 0 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #8fdf8f;
+}
+
+.wallpaper-other {
+    margin-top: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: lightgray;
+}
+
+.wallpaper-other > summary {
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.75);
+    list-style: none;
+}
+
+.wallpaper-other > summary::-webkit-details-marker {
+    display: none;
+}
+
+.wallpaper-other > summary::before {
+    content: '\25B8';
+    display: inline-block;
+    margin-right: 0.4em;
+    color: gray;
+}
+
+.wallpaper-other[open] > summary::before {
+    content: '\25BE';
+}
+
+.wallpaper-other-body {
+    margin-top: 12px;
+}
+
+.wallpaper-other-section {
+    margin: 0 0 1em;
+    padding-bottom: 1em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wallpaper-other-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.wallpaper-other-title {
+    margin: 0 0 0.4em;
+    font-size: 14px;
+    font-weight: normal;
+    color: white;
+}
+
+.wallpaper-body a,
+.wallpaper-other-body a {
+    color: #7eb6ff;
+}
+
+.help-section {
+    margin: 0 0 1.25em;
+}
+
+.help-section:last-child {
+    margin-bottom: 0;
+}
+
+.help-section-title {
+    margin: 0 0 0.5em;
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    font-weight: normal;
+    color: white;
+}
+
+.help-user-guide {
+    margin: 0 0 0.75em;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.help-user-guide a {
+    color: #9ec9ff;
+    text-decoration: none;
+}
+
+.help-user-guide a:hover {
+    text-decoration: underline;
+}
+
+.help-blurb {
+    margin: 0 0 0.75em;
+    color: darkgray;
+}
+
+.help-blurb strong {
+    color: lightgray;
+    font-weight: normal;
+}
+
+.help-gestures {
+    margin: 0;
+}
+
+.help-row {
+    display: grid;
+    grid-template-columns: minmax(7.5rem, 34%) 1fr;
+    gap: 0.35em 0.75em;
+    margin: 0 0 0.55em;
+    align-items: start;
+}
+
+.help-row:last-child {
+    margin-bottom: 0;
+}
+
+.help-row dt {
+    margin: 0;
+    color: darkgoldenrod;
+    font-weight: normal;
+}
+
+.help-row dd {
+    margin: 0;
+    color: lightgray;
+}
+
+.settings-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    /* #topUI is pointer-events:none so empty chrome does not steal globe hits. */
+    pointer-events: auto;
+}
+
+.settings-panel[hidden] {
+    display: none;
+}
+
+.settings-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+}
+
+.settings-dialog {
+    position: relative;
+    max-width: 360px;
+    width: 100%;
+    max-height: min(86vh, 640px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 28px 24px 24px;
+    background: rgba(18, 18, 18, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    color: lightgray;
+    /* Native <select> popups follow color-scheme; without this, white text on a light OS menu. */
+    color-scheme: dark;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.settings-close {
+    all: unset;
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    font-size: 28px;
+    line-height: 32px;
+    color: gray;
+    cursor: pointer;
+    text-align: center;
+}
+
+.settings-close:hover,
+.settings-close:focus-visible {
+    color: white;
+}
+
+.settings-title {
+    margin: 0 0 20px;
+    font-family: 'Courier New', monospace;
+    font-size: 20px;
+    font-weight: normal;
+    color: white;
+    text-align: center;
+}
+
+.settings-field {
+    display: block;
+    margin-bottom: 18px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+}
+
+.settings-field:last-child {
+    margin-bottom: 0;
+}
+
+.settings-label {
+    display: block;
+    margin-bottom: 8px;
+    color: lightgray;
+}
+
+.settings-field-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.settings-field-checkbox .settings-label {
+    margin-bottom: 0;
+}
+
+.settings-hint {
+    margin: 4px 0 12px 28px;
+    color: rgba(180, 180, 180, 0.85);
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.settings-control {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: #f0f0f0;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+}
+
+select.settings-control {
+    width: 100%;
+    padding: 8px 10px;
+    color-scheme: dark;
+    background: #2a2a2a;
+}
+
+select.settings-control option {
+    background-color: #1e1e1e;
+    color: #f0f0f0;
+}
+
+.settings-speed,
+.settings-slider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.settings-speed input[type="range"],
+.settings-slider input[type="range"] {
+    flex: 1;
+    accent-color: darkgoldenrod;
+}
+
+.settings-speed-label,
+.settings-slider-value {
+    min-width: 72px;
+    text-align: right;
+    color: darkgoldenrod;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+}
+
+.settings-action {
+    all: unset;
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: lightgray;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.settings-action:hover,
+.settings-action:focus-visible {
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+}
+
+.settings-action:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+a.settings-action {
+    text-decoration: none;
+}
+
+
+/* Live-Earth credit label (Now + Wallpaper) — Images / NASA | DSCOVR:EPIC */
+body.bt-now #epicTimeline .epic-timeline-canvas,
+body.bt-now #timelineChrome .timeline-chrome-transport,
+body.bt-now #timelineChrome .timeline-analemma-caption,
+body.bt-now #timelineChrome #loading-text,
+body.bt-wallpaper #epicTimeline .epic-timeline-canvas,
+body.bt-wallpaper #timelineChrome .timeline-chrome-transport,
+body.bt-wallpaper #timelineChrome .timeline-analemma-caption,
+body.bt-wallpaper #timelineChrome #loading-text,
+body.bt-wallpaper #oppositeTopChrome {
+    display: none !important;
+}
+
+body.bt-now #epicTimeline,
+body.bt-wallpaper #epicTimeline {
+    display: block !important;
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    top: auto;
+    width: auto;
+    height: auto !important;
+    min-height: 0;
+    background: none;
+    border: none;
+    pointer-events: none;
+    z-index: 20;
+    /* Attribution stays visible even when other chrome fades. */
+    opacity: 1 !important;
+}
+
+body.bt-now #epicTimeline .timeline-chrome,
+body.bt-wallpaper #epicTimeline .timeline-chrome {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    top: auto;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+}
+
+body.bt-now #epicTimeline .timeline-chrome-inner,
+body.bt-wallpaper #epicTimeline .timeline-chrome-inner {
+    position: relative;
+    inset: auto;
+}
+
+body.bt-now #epicTimeline .timeline-chrome-bottom-stack,
+body.bt-wallpaper #epicTimeline .timeline-chrome-bottom-stack {
+    position: relative;
+    inset: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    max-width: none;
+    width: 100%;
+    align-items: stretch;
+}
+
+body.bt-now #epicTimeline .timeline-chrome-controls-row,
+body.bt-wallpaper #epicTimeline .timeline-chrome-controls-row {
+    display: block;
+    width: 100%;
+}
+
+body.bt-now #epicTimeline .timeline-chrome-date-wrap,
+body.bt-wallpaper #epicTimeline .timeline-chrome-date-wrap {
+    position: relative;
+    inset: auto;
+    bottom: auto;
+    right: auto;
+    left: auto;
+    max-width: none;
+    width: 100%;
+    text-align: right;
+    align-items: stretch;
+}
+
+body.bt-now #dragHintStack,
+body.bt-split-row #dragHintStack,
+body.bt-split-col #dragHintStack,
+body.bt-now #speedDragValueToast,
+body.bt-now #playPauseFlash {
+    display: none !important;
+}
+
+body.bt-now #menuAccount,
+body.bt-now #menuMapMode,
+body.bt-now #menuExtensionsWrap {
+    display: none !important;
+}
+
+/* The date / time is twice the base size on the timeline (`--bt-date-scale`); these layouts keep the base size. */
+body.bt-now,
+body.bt-wallpaper {
+    --bt-date-scale: 1;
+}
+
+body.bt-now #current-time-text,
+body.bt-wallpaper #current-time-text {
+    cursor: pointer;
+    pointer-events: auto;
+    white-space: normal;
+    line-height: 1.35;
+    font-weight: normal;
+    color: rgba(255, 255, 255, 0.6);
+    overflow: visible;
+    text-overflow: unset;
+    max-width: none;
+    width: 100%;
+    display: flex;
+    gap: 0.5rem 1rem;
+}
+
+/* Landscape (and default): Images left, date/time right — wrap date/time as a unit. */
+body.bt-now #current-time-text,
+body.bt-wallpaper #current-time-text {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    text-align: left;
+}
+
+body.bt-now #current-time-text .now-images-credit,
+body.bt-wallpaper #current-time-text .now-images-credit {
+    flex: 0 1 auto;
+    min-width: 0;
+    text-align: left;
+}
+
+body.bt-now #current-time-text .now-images-date,
+body.bt-wallpaper #current-time-text .now-images-date {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: flex-end;
+    column-gap: 0.35em;
+    row-gap: 0.1em;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: min(55%, 22rem);
+    margin-top: 0;
+    text-align: right;
+    font-weight: normal;
+    color: inherit;
+}
+
+body.bt-now #current-time-text .now-images-day,
+body.bt-now #current-time-text .now-images-tod,
+body.bt-wallpaper #current-time-text .now-images-day,
+body.bt-wallpaper #current-time-text .now-images-tod {
+    display: inline;
+}
+
+/* Portrait: both right-aligned; Images above date/time. */
+@media (orientation: portrait) {
+    body.bt-now #current-time-text,
+    body.bt-wallpaper #current-time-text {
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: flex-end;
+        text-align: right;
+        gap: 0.15em;
+    }
+
+    body.bt-now #current-time-text .now-images-credit,
+    body.bt-wallpaper #current-time-text .now-images-credit {
+        text-align: right;
+        max-width: 100%;
+    }
+
+    body.bt-now #current-time-text .now-images-date,
+    body.bt-wallpaper #current-time-text .now-images-date {
+        max-width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+body.bt-now .view-caption-shortcut[hidden] {
+    display: none !important;
+}
+
+/* ?mode=wallpaper — live Earth only: globe + credit label, no other chrome */
+body.bt-wallpaper #appMenu,
+body.bt-wallpaper #oppositeTopChrome,
+body.bt-wallpaper #dragHintStack,
+body.bt-wallpaper #speedDragValueToast,
+body.bt-wallpaper #playPauseFlash,
+body.bt-wallpaper #toastHost,
+body.bt-wallpaper .chrome-idle-fade,
+body.bt-wallpaper #settingsDialog,
+body.bt-wallpaper #helpDialog,
+body.bt-wallpaper #shareDialog {
+    display: none !important;
+}
+
+/* Split view, its buttons and the floating window: bt/split/split.css. */
+
+/* PanZoomView (bt/pan_zoom_view.js): cover-cropped, pannable, zoomable image. */
+.bt-pan-zoom {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+}
+
+.bt-pan-zoom:active {
+    cursor: grabbing;
+}
+
+.bt-pan-zoom-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+}
+
+.bt-pan-zoom img {
+    position: absolute;
+    left: 0;
+    top: 0;
+    max-width: none;
+    transform-origin: 0 0;
+    -webkit-user-drag: none;
+}
+
+/* time_lock.js: time chrome is inert while the clock is locked. */
+body.bt-time-locked #epicTimeline,
+body.bt-time-locked #epicTimeline *,
+body.bt-time-locked #date-picker {
+    pointer-events: none !important;
+}
+
+/* "New satellite clouds" toast (clouds/clouds_toast.js), as .sky-live-toast. */
+.clouds-toast {
+    position: fixed;
+    left: 50%;
+    top: 16px;
+    transform: translate(-50%, -150%);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    padding: 8px 8px 8px 14px;
+    border-radius: 20px;
+    background: rgba(20, 24, 32, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    color: white;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.clouds-toast--shown {
+    transform: translate(-50%, 0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.clouds-toast-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.clouds-toast-what,
+.clouds-toast-when {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.clouds-toast-when {
+    font-size: 12px;
+    color: rgb(240, 160, 230);
+}
+
+.clouds-toast-close {
+    flex: none;
+    border: none;
+    background: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+/* Split view: the view captions (info, "Hide this info") stay in the Earth
+   half's corner, not the screen's. The chrome lies opposite the menu, so a
+   side-by-side split would put it over the pane: pull its inner edge in by the
+   pane's share (the timeline moves the same way, timeline.css). Stacked, it is
+   already at the top, over the Earth half. Nothing of it shows once the globe
+   is hidden. */
+body.bt-split-row:not(.bt-split-flip) .opposite-top-chrome--right {
+    right: calc(var(--bt-split, 0) * 100% + 8px);
+}
+
+body.bt-split-row.bt-split-flip .opposite-top-chrome--left {
+    left: calc(var(--bt-split, 0) * 100% + 8px);
+}
+
+body.timeline-vertical.bt-split-row:not(.bt-split-flip) .opposite-top-chrome--right {
+    right: calc(var(--bt-split, 0) * 100% + var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) + 8px);
+}
+
+body.timeline-vertical.bt-split-row.bt-split-flip .opposite-top-chrome--left {
+    left: calc(var(--bt-split, 0) * 100% + var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) + 8px);
+}
+
+body.timeline-vertical.bt-split-row .opposite-top-chrome {
+    width: calc((1 - var(--bt-split, 0)) * 100% - var(--timeline-interior-inset, 172px) / var(--bt-ui-scale, 1) - 8px - 5.5rem);
+}
+
+body.bt-split-earth-hidden #oppositeTopChrome {
+    display: none;
+}
+
+/* Split view: the date / time may grow to three times the base size (not two) where the Earth half leaves it the
+   room: its size follows the width its box has (`100cqw`, see #current-time-text), so a narrow half keeps it small. */
+body:is(.bt-split-row, .bt-split-col):not(.bt-now, .bt-wallpaper) {
+    --bt-date-scale: 3;
+}
+
+/* Split view (photo preview, live camera, …): no view menus, no back /
+   forth; the view label stays and moves up into their place. */
+body:is(.bt-split-col, .bt-split-row) .view-caption-select-row,
+body:is(.bt-split-col, .bt-split-row) #selectionNav,
+body:is(.bt-split-col, .bt-split-row) #selectionHistoryMenu {
+    display: none !important;
+}
