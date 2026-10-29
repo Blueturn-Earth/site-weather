@@ -1,0 +1,8 @@
+<svg color="#fff" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <!-- Parallel viewing: each eye looks straight ahead. -->
+  <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+    <circle cx="7.5" cy="19" r="2.6"/>
+    <circle cx="16.5" cy="19" r="2.6"/>
+    <path d="M7.5 15.4V3.5M16.5 15.4V3.5"/>
+  </g>
+</svg>

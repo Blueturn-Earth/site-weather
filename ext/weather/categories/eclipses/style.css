@@ -1,0 +1,26 @@
+.eclipse-path-corridor,
+.eclipse-umbra {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.eclipse-greatest {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.eclipse-hitbox {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.eclipse-path-label {
+  font: 700 13px/1.25 system-ui, sans-serif;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.eclipse-path-label-hit {
+  pointer-events: all;
+  cursor: pointer;
+}

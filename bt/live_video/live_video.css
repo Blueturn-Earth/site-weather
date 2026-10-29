@@ -1,0 +1,580 @@
+/* A live stream's video pane and its chat (bt/live_video/): the video's stage, frame and pan layer, the chat list, its composer, the Go live button.
+   Extensions style their own extras (ISS: the chat dots' bubble, the place label over the video). */
+
+/* The chat in the video pane's info (media layout, split only): a list of lines up to the clock, following it. */
+.bt-media-layout.has-info .bt-media-info:has(.bt-live-chat) {
+  padding: 6px 8px;
+}
+
+.bt-live-chat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  /* Always the small size (the info's least, 13px, at 0.85): not `--bt-info-font`, which grows to fit the box as the divider moves. */
+  font-size: 11px;
+  /* No browser flash on a press (the blue tap rectangle, a word selected by a double click): what lights up is the time to jump to (`.is-pressed`). */
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bt-live-chat button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.bt-live-chat-list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* The pane moves the scroll itself (a target the view eases toward): the browser must not add its own corrections. */
+  overflow-anchor: none;
+  /* Room above the first line and under the last (set from the list's height, chat_pane.js): they can be in the middle too. */
+  padding: var(--bt-live-chat-pad, 0px) 0;
+}
+
+.bt-live-chat-line {
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.bt-live-chat-line.is-current {
+  background: rgba(143, 161, 179, 0.2);
+  box-shadow: inset 3px 0 0 #8fa1b3;
+}
+
+/* The lines after the video's time: what is still to be said. */
+.bt-live-chat-line.is-future {
+  opacity: 0.55;
+}
+
+.bt-live-chat-line.is-selected {
+  background: rgba(255, 179, 0, 0.2);
+}
+
+.bt-live-chat-time {
+  margin-right: 0.6em;
+  color: #8fa1b3;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The time a press is about to jump to: lit blue, the header time or a quoted one. */
+.bt-live-chat-time.is-pressed,
+.bt-live-chat-clock.is-pressed {
+  background: rgba(94, 132, 241, 0.6);
+  color: #fff;
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px rgba(94, 132, 241, 0.6);
+}
+
+.bt-live-chat-avatar {
+  width: 1.5em;
+  height: 1.5em;
+  margin-right: 0.35em;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: -0.35em;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* The author's picture at full size, beside the small one under a mouse (sen/chat_avatar.js). */
+.bt-live-avatar-preview {
+  position: fixed;
+  z-index: 60;
+  padding: 4px;
+  border-radius: 14px;
+  background: #0b0f14;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.bt-live-avatar-preview[hidden] {
+  display: none;
+}
+
+.bt-live-avatar-preview img {
+  display: block;
+  border-radius: 10px;
+  min-width: 96px;
+  min-height: 96px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.bt-live-chat-author {
+  margin-right: 0.5em;
+  /* As on YouTube: gray (white at 70%), and the channel's owner and the moderators in its moderator blue. */
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.bt-live-chat-author.is-privileged {
+  color: #5e84f1;
+}
+
+/* Members and verified users. */
+.bt-live-chat-author.is-supporter {
+  color: #e040fb;
+}
+
+.bt-live-chat-text {
+  overflow-wrap: anywhere;
+}
+
+.bt-live-chat-clock {
+  padding: 0 3px;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(255, 179, 0, 0.25);
+  color: #ffc94d;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+button.bt-live-chat-clock {
+  cursor: pointer;
+}
+
+/* A quoted time the video cannot show: text, not a link. */
+.bt-live-chat-clock.is-dead {
+  background: none;
+  color: inherit;
+  opacity: 0.6;
+  text-decoration: underline dotted;
+}
+
+.bt-live-chat-empty {
+  padding: 8px 4px;
+  color: #8fa1b3;
+}
+
+.bt-live-chat-follow {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font: 600 12px/1.2 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.bt-live-chat-follow.is-top {
+  top: 6px;
+  bottom: auto;
+}
+
+.bt-live-chat-follow[hidden],
+.bt-live-chat-empty[hidden] {
+  display: none;
+}
+
+/* "+": opens the field to write in the chat. An overlay on the list's bottom-right corner, above "Follow" (the list keeps all the height), and larger. */
+.bt-live-chat-plus {
+  position: absolute;
+  right: 8px;
+  bottom: 36px;
+  width: 44px;
+  height: 44px;
+  padding: 0 0 3px;
+  border: 0;
+  border-radius: 50%;
+  background: #00e5ff;
+  color: #00222b;
+  font: 600 30px/1 system-ui, sans-serif;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bt-live-chat-plus[hidden] {
+  display: none;
+}
+
+/* The chat's view (the list and what lies over it) and, under it, the field to write in (sen/chat/chat_composer.js). */
+.bt-live-chat-view {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.bt-live-chat-composer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.bt-live-chat-composer[hidden],
+.bt-live-chat-composer [hidden] {
+  display: none;
+}
+
+.bt-live-chat-send {
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font: 600 11px/1.2 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.bt-live-chat-send:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.bt-live-chat-why {
+  color: #8fa1b3;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+/* Inside the `why` text, at its end: the same size, running on with it. */
+.bt-live-chat-yt {
+  all: unset;
+  color: #9fd4ff;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.bt-live-chat-yt:focus-visible {
+  outline: 1px solid #9fd4ff;
+}
+
+.bt-live-chat-form {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+}
+
+.bt-live-chat-field {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+
+.bt-live-chat-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 4px 8px 4px 26px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  background: #0b0e12;
+  color: #f4f4f4;
+  font: inherit;
+}
+
+.bt-live-chat-clear {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  background: #c3ccd5;
+  -webkit-mask: url('images/clear.svg') center / 14px no-repeat;
+  mask: url('images/clear.svg') center / 14px no-repeat;
+  cursor: pointer;
+}
+
+.bt-live-chat-input:focus {
+  outline: none;
+  border-color: #ffb300;
+}
+
+/* The confirmation before a message is posted (a modal <dialog>, in the top layer: above the pane, the globe and the menus). */
+.bt-live-chat-confirm {
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  background: #11161c;
+  color: #f4f4f4;
+  font: 13px/1.35 system-ui, sans-serif;
+}
+
+.bt-live-chat-confirm::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.bt-live-chat-confirm-title {
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.bt-live-chat-confirm-message {
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 8px;
+  border-radius: 6px;
+  background: #0b0e12;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bt-live-chat-confirm-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.bt-live-chat-confirm-cancel,
+.bt-live-chat-confirm-ok {
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font: 600 13px/1.2 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.bt-live-chat-confirm-ok {
+  border-color: #ffb300;
+  background: #ffb300;
+  color: #111;
+}
+
+.bt-live-chat-note {
+  color: #ff8a80;
+  line-height: 1.3;
+}
+
+.bt-live-chat-note.is-info {
+  color: #9fd4ff;
+}
+
+/* Writing on a phone (chat/chat_compose_mode.js): the pane is all that the keyboard leaves of the screen, laid over the globe,
+   the timeline and the menus, and holds the video and the field only. */
+body.bt-live-composing #btSplitPane {
+  top: var(--bt-live-vv-top, 0px) !important;
+  bottom: auto !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: auto !important;
+  height: var(--bt-live-vv-height, 100%) !important;
+  z-index: 2000 !important;
+}
+
+body.bt-live-composing .bt-split-divider {
+  display: none !important;
+}
+
+/* Full height (video_pane.js) gives the chat a share of the pane, but never less than its least height (five lines): the "+" over its
+   bottom-right corner (80 px up from the bottom) is always in view. */
+body .bt-media-layout.has-info.has-info-share:not(.is-row) .bt-media {
+  flex-basis: min(calc((1 - var(--bt-media-info-share, 0.2)) * 100%), calc(100% - var(--bt-media-reserve-h)));
+}
+
+/* Stacked (portrait): the field is at the bottom, right above the keyboard, and the video's box has everything above it (whatever the chat's
+   share in full height, the 16:9 box of the split): the full-height fit gets the most room. Beside the video (landscape) the field is at the
+   bottom of the chat's column. */
+body.bt-live-composing .bt-media-layout.has-info:not(.is-row) {
+  justify-content: flex-start;
+}
+
+body.bt-live-composing .bt-media-layout.has-info:not(.is-row) .bt-media {
+  flex: 1 1 0;
+  width: 100%;
+  aspect-ratio: auto;
+}
+
+body.bt-live-composing .bt-media-layout.has-info:not(.is-row) .bt-media-info {
+  flex: 0 0 auto;
+}
+
+.bt-live-chat.is-composing .bt-live-chat-view {
+  display: none;
+}
+
+.bt-live-chat.is-composing .bt-live-chat-composer {
+  margin-top: auto;
+  border-top: 0;
+}
+
+.bt-live-chat.is-composing {
+  justify-content: flex-end;
+}
+
+.bt-live-chat.is-composing {
+  font-size: 14px;
+}
+
+@media (pointer: coarse) {
+  /* 16px: a smaller field makes iOS zoom the page when it is focused. */
+  .bt-live-chat-input {
+    font-size: 16px;
+  }
+}
+
+.bt-split-btn.bt-live-chat-toggle {
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+}
+
+.bt-split-btn.bt-live-chat-toggle.is-on {
+  background: rgba(255, 179, 0, 0.75);
+  border-color: rgba(255, 255, 255, 0.85);
+}
+
+.bt-split-btn.bt-live-chat-toggle[hidden] {
+  display: none;
+}
+
+/* The gyro pan's switch (video_view.js): lit while turning the phone pans the video. */
+.bt-split-btn.bt-live-gyro-toggle {
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+}
+
+.bt-split-btn.bt-live-gyro-toggle.is-on {
+  background: rgba(255, 179, 0, 0.75);
+  border-color: rgba(255, 255, 255, 0.85);
+}
+
+.bt-split-btn.bt-live-gyro-toggle[hidden] {
+  display: none;
+}
+
+/* Live video in the split pane: covers the full height (cropped at the sides, panned by drag) or spans the full width. */
+.bt-live-split-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+/* Sized and placed by video_view.js. */
+.bt-live-video-frame {
+  position: absolute;
+}
+
+.bt-live-video-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* The player's "More videos" strip, shown when it is paused, sits at the bottom of its iframe: the iframe is twice as tall as the frame,
+   its picture (centered, as wide as the frame) in the frame and the strip in the half below, which the frame clips. */
+.bt-live-video-frame.bt-live-video-crop-more {
+  overflow: hidden;
+}
+
+.bt-live-video-frame.bt-live-video-crop-more iframe {
+  inset: auto 0 auto 0;
+  top: -50%;
+  height: 200%;
+}
+
+/* Over the top of the video (bottom set in video_view.js, leaving the player's own UI): horizontal pan, tap to play / pause. */
+.bt-live-video-pan {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  touch-action: none;
+  cursor: grab;
+}
+
+.bt-live-video-pan.is-panning {
+  cursor: grabbing;
+}
+
+/* The Go live button (go_live_button.js), in the video's top bar: a split button like the chat's. Pale red while the clock is
+   somewhere else, gray while it is live. */
+.bt-split-btn.bt-live-go-live {
+  border: 1.5px solid rgba(255, 107, 107, 0.7);
+  background: rgba(255, 107, 107, 0.3);
+  color: #ff9d9d;
+}
+
+.bt-split-btn.bt-live-go-live:hover,
+.bt-split-btn.bt-live-go-live:focus-visible {
+  background: rgba(255, 107, 107, 0.5);
+  border-color: #ff6b6b;
+}
+
+/* Live: nothing to go to. */
+.bt-split-btn.bt-live-go-live.is-live {
+  color: #9aa7b4;
+  background: rgba(0, 0, 0, 0.55);
+  border-color: rgba(255, 255, 255, 0.2);
+  cursor: default;
+}
+
+/* The last line of the chat list (chat/chat_pane.js): a red line, back to the live edge; gray while the clock is there. */
+.bt-live-chat-golive {
+  all: unset;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 4px 8px;
+  border-top: 2px solid #ff4d4d;
+  color: #ff6b6b;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+
+.bt-live-chat-golive:not(.is-live):hover,
+.bt-live-chat-golive:not(.is-live):focus-visible {
+  background: rgba(255, 77, 77, 0.12);
+}
+
+.bt-live-chat-golive.is-live {
+  border-top-color: rgba(255, 255, 255, 0.25);
+  color: #9aa7b4;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* What tells the viewer the video does not play (video_pane.js), over the video: the player's error, or a frame that never loaded. */
+.bt-live-video-note {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 6;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  max-width: min(90%, 460px);
+  padding: 10px 14px;
+  border: 1px solid #ffb300;
+  border-radius: 8px;
+  background: rgba(10, 14, 20, 0.92);
+  color: #e8eef6;
+  font: 12px / 1.4 system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+
+.bt-live-video-note[hidden] {
+  display: none;
+}
+
+.bt-live-video-note a {
+  display: inline-block;
+  margin-top: 6px;
+  color: #9fd4ff;
+  pointer-events: auto;
+}

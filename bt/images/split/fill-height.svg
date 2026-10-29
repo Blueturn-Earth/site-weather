@@ -1,0 +1,5 @@
+<svg color="#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+     stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fill pane height: arrows pointing out up and down, between two bars -->
+  <path d="M12 4v16M12 4L9 7M12 4l3 3M12 20l-3-3M12 20l3-3M5 3h14M5 21h14"/>
+</svg>

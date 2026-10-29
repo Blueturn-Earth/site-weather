@@ -1,0 +1,83 @@
+/*
+ * The buttons over the corner of a pane's content (split_controls.js: sound, fit, fullscreen, ×, dock, and the owner's own). Used by the
+ * split pane, the floating window and any page that mounts a video view; nothing here needs the split itself.
+ */
+
+/* Buttons over the corner of a pane's content (split_controls.js): `start` at the top left, `end` at the top right. Their
+   size is a share of the screen's short side, so it follows the device: 64px at most, about 10% on a phone. */
+:root {
+    --bt-split-btn-size: clamp(36px, 10vmin, 64px);
+}
+
+.bt-split-bar {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    /* Only the buttons take presses: the content under the bar stays its own. */
+    pointer-events: none;
+}
+
+.bt-split-bar-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.bt-split-btn {
+    pointer-events: auto;
+    display: grid;
+    place-items: center;
+    width: var(--bt-split-btn-size);
+    height: var(--bt-split-btn-size);
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    cursor: pointer;
+    opacity: 0.75;
+    /* The opacity timing is that of `.chrome-autohide` (the idle fade), which this rule would otherwise replace. */
+    transition: opacity 0.65s ease, background 0.15s;
+}
+
+.bt-split-btn[hidden],
+body:not(.bt-split-col) .bt-split-pane-top,
+body:not(.bt-split-row) .bt-split-pane-side {
+    display: none;
+}
+
+.bt-split-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.bt-split-btn:not(:disabled):hover,
+.bt-split-btn:not(:disabled):focus-visible {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.bt-split-btn svg {
+    width: 62.5%;
+    height: 62.5%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bt-split-btn {
+        transition: opacity 0.15s ease, background 0.15s;
+    }
+}
+
+/* The pane is fullscreen: only the sound and the way out stay of the buttons, and none of the globe half's chrome. */
+.bt-split-bar.is-fullscreen .bt-split-fit,
+.bt-split-bar.is-fullscreen .bt-split-pane-top,
+.bt-split-bar.is-fullscreen .bt-split-pane-side,
+.bt-split-bar.is-fullscreen .bt-split-close {
+    display: none;
+}
