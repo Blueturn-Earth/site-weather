@@ -1,0 +1,365 @@
+/* Filter bar shared by Weather and Skypics (ext/shared/chip_filter_bar.js). */
+
+.chip-filter {
+  position: fixed;
+  /* Above globe SVG overlays (z 16) so the category select stays clickable. */
+  z-index: var(--z-overlay-menu-corner, 20);
+  top: var(--chrome-extension-row-top, 54px);
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 3px;
+  padding: 4px 6px;
+  box-sizing: border-box;
+  height: auto;
+  min-height: var(--chip-filter-row-height, 40px);
+  background: rgba(0, 0, 0, 0.62);
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+  -webkit-user-select: none;
+  user-select: none;
+  overflow: hidden;
+}
+
+.chip-filter[hidden] {
+  display: none !important;
+}
+
+/* A line under the chips row (chip_filter_bar.js setFooter): an extension's note on the selection. */
+.chip-filter-footer {
+  padding: 1px 4px 0;
+  font: 600 13px/1.25 system-ui, sans-serif;
+  color: var(--chip-filter-footer-color, #1de9b6);
+  /* A long title wraps (the link goes with its last line) instead of being cut. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* A newline in the text is a line break. */
+.chip-filter-footer-text {
+  white-space: pre-line;
+}
+
+.chip-filter.scroll-menu-right .chip-filter-footer {
+  text-align: right;
+}
+
+.chip-filter-footer[hidden] {
+  display: none;
+}
+
+.chip-filter-footer-link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* A button written as a link, on its own line under the footer text: slightly smaller, pale red. */
+.chip-filter-footer-action {
+  all: unset;
+  display: block;
+  box-sizing: border-box;
+  /* A block button shrinks to its text: full width, so it follows the footer's text-align (centered alone). */
+  width: 100%;
+  margin-top: 1px;
+  font: 600 12px/1.25 system-ui, sans-serif;
+  color: #ff9d98;
+  text-decoration: underline;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.chip-filter-footer-action:hover,
+.chip-filter-footer-action:focus-visible {
+  color: #ffc4c0;
+}
+
+/* Only the footer: no search box, no chips, and nothing of the bar takes a press but the link. */
+.chip-filter.is-footer-only {
+  min-height: 0;
+  pointer-events: none;
+  /* No panel behind the lone title (the extension gives the text its own outline). */
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
+  /* Centered on the Earth half, on the row of the bar: position() puts `left` at the half's middle. */
+  transform: translateX(-50%);
+}
+
+/* The title alone starts at the top of the row. */
+.chip-filter.is-footer-only .chip-filter-footer {
+  padding: 0;
+  text-align: center;
+}
+
+.chip-filter.is-footer-only .chip-filter-primary,
+.chip-filter.is-footer-only .chip-filter-types {
+  display: none;
+}
+
+.chip-filter.is-footer-only .chip-filter-footer-link,
+.chip-filter.is-footer-only .chip-filter-footer-action {
+  pointer-events: auto;
+}
+
+.chip-filter.scroll-menu-right {
+  align-items: stretch;
+}
+
+.chip-filter.scroll-menu-left {
+  align-items: stretch;
+}
+
+.chip-filter-primary {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 3px;
+  /* Bar width (chip_filter_bar.js position()): the search box takes the rest. */
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chip-filter.scroll-menu-right .chip-filter-primary {
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  align-self: flex-end;
+}
+
+.chip-filter.scroll-menu-left .chip-filter-primary {
+  flex-direction: row;
+  justify-content: flex-start;
+  align-self: flex-start;
+}
+
+.chip-filter-search {
+  all: unset;
+  box-sizing: border-box;
+  min-width: 56px;
+  flex: 1 1 96px;
+  max-width: none;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #eee;
+  font: 12px/26px system-ui, sans-serif;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.chip-filter-category {
+  flex: 0 0 auto;
+  height: 26px;
+  min-width: 5.5em;
+  width: max-content;
+  max-width: none;
+  padding: 0 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(30, 30, 30, 0.95);
+  color: #eee;
+  font: 12px system-ui, sans-serif;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.chip-filter-search::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.chip-filter-chip-bulk {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  align-items: center;
+}
+
+.chip-filter:not(.show-type-chips) .chip-filter-chip-bulk {
+  display: none;
+}
+
+.chip-filter-bulk {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  font: 11px/1 system-ui, sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chip-filter-bulk:hover:not(:disabled):not(.is-on) {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.chip-filter-bulk.is-on,
+.chip-filter-bulk:active:not(:disabled) {
+  background: #fff;
+  border-color: #fff;
+  color: #111;
+  font-weight: 600;
+}
+
+.chip-filter-bulk:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.chip-filter-types {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  align-items: center;
+  align-self: stretch;
+  flex: 0 0 auto;
+  /* As wide as the first row (category … None), never wider: zero
+     intrinsic width, then stretched to the bar. One row, scrolled sideways. */
+  width: 0;
+  min-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+
+.chip-filter-types::-webkit-scrollbar {
+  display: none;
+}
+
+/* Chips scrolled out of view on a side (chip_filter_bar.js): fade to the
+   bar's black there, hinting the row goes on. */
+.chip-filter-types {
+  --fade-left: 0px;
+  --fade-right: 0px;
+  -webkit-mask-image: linear-gradient(to right,
+    transparent 0, #000 var(--fade-left),
+    #000 calc(100% - var(--fade-right)), transparent 100%);
+  mask-image: linear-gradient(to right,
+    transparent 0, #000 var(--fade-left),
+    #000 calc(100% - var(--fade-right)), transparent 100%);
+}
+
+.chip-filter-types.is-clipped-left {
+  --fade-left: 28px;
+}
+
+.chip-filter-types.is-clipped-right {
+  --fade-right: 28px;
+}
+
+/* Menu-side origin: first chip (ET) sits at the menu edge; the rest follow. */
+.chip-filter.scroll-menu-right .chip-filter-types {
+  flex-direction: row;
+  justify-content: flex-start;
+  direction: rtl;
+}
+
+.chip-filter.scroll-menu-left .chip-filter-types {
+  flex-direction: row;
+  justify-content: flex-start;
+  direction: ltr;
+}
+
+.chip-filter.scroll-menu-right .chip-filter-type {
+  direction: ltr;
+}
+
+.chip-filter:not(.show-type-chips) .chip-filter-types {
+  display: none;
+}
+
+.chip-filter-types.is-disabled {
+  opacity: 0.42;
+}
+
+.chip-filter-type {
+  all: unset;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 40px;
+  min-height: 28px;
+  height: auto;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--intensity-color, #aaa) 55%, transparent);
+  color: var(--intensity-color, #eee);
+  font: 600 10px/1.15 system-ui, sans-serif;
+  text-align: center;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--intensity-color, #aaa) 14%, transparent);
+}
+
+.chip-filter-type-line {
+  display: block;
+  white-space: nowrap;
+}
+
+.chip-filter-type:disabled {
+  cursor: default;
+}
+
+.chip-filter-type.is-on {
+  color: #111;
+  border-color: var(--intensity-color, #fff);
+  background: var(--intensity-color, #fff);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--intensity-color, #fff) 40%, transparent);
+}
+
+/* Filter toggle (filter_toggle.js): menu corner column, like Skypics' corner buttons. */
+.chip-filter-toggle {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(20, 28, 40, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+}
+
+.chip-filter-toggle[hidden] {
+  display: none;
+}
+
+.chip-filter-toggle:hover,
+.chip-filter-toggle:focus-visible {
+  background: rgba(40, 56, 80, 0.95);
+}
+
+.chip-filter-toggle.is-on {
+  background: rgba(30, 136, 229, 0.55);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.chip-filter-toggle img {
+  width: 22px;
+  height: 22px;
+  display: block;
+  pointer-events: none;
+}

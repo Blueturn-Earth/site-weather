@@ -1,0 +1,125 @@
+/* The picture with its info (media_layout.js): see below. Used by the split pane and by any page that mounts a media layout. */
+
+/*
+ * The picture with its info (media_layout.js): the picture as large as the pane lets it be, whole, the info in what is
+ * left, as large as fits; without the info the picture fills the pane. Stacked in a pane narrower than the picture's
+ * shape, side by side in a wider one (`is-row`, set by media_layout.js). The buttons lie over the picture, as they do
+ * without the info, so the picture has the pane's full height (stacked: its full width); beside the picture, the info
+ * starts under them.
+ */
+.bt-media-stage {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: #000;
+    container-type: size;
+}
+
+.bt-media-layout {
+    /* The info's least height (stacked) and width (side by side); media_layout.js sets them for the screen. */
+    --bt-media-reserve-h: 140px;
+    --bt-media-reserve-w: 200px;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.bt-media {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.bt-media-info {
+    display: none;
+}
+
+.bt-media-layout.has-info > .bt-media {
+    flex: 0 0 auto;
+    align-self: center;
+    aspect-ratio: var(--bt-media-ratio, 1.7778);
+    width: min(100cqw, max(0px, calc((100cqh - var(--bt-media-reserve-h)) * var(--bt-media-ratio, 1.7778))));
+}
+
+.bt-media-layout.has-info > .bt-media-info {
+    display: block;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    box-sizing: border-box;
+    padding: 12px;
+    background: #12161b;
+    color: #f4f4f4;
+    font: var(--bt-info-font, 13px) / 1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    overflow-wrap: anywhere;
+}
+
+.bt-media-layout.has-info.is-row {
+    flex-direction: row;
+}
+
+.bt-media-layout.has-info.is-row > .bt-media {
+    width: auto;
+    height: min(100cqh, max(0px, calc((100cqw - var(--bt-media-reserve-w)) / var(--bt-media-ratio, 1.7778))));
+}
+
+/* Beside the picture the info is at the pane's top, under the buttons that lie over its corner (a top inset, e.g. a strip). */
+.bt-media-layout.has-info.is-row > .bt-media-info {
+    padding-top: calc(var(--bt-split-bar-inset-top, 0px) + var(--bt-split-btn-size) + 16px);
+}
+
+/* Portrait pane with no room to stack (media_layout.js `is-info-clipped`): the picture alone, the info hidden. */
+.bt-media-layout.has-info.is-row.is-info-clipped > .bt-media {
+    flex: 1 1 auto;
+    align-self: stretch;
+    width: auto;
+    height: auto;
+    aspect-ratio: auto;
+}
+
+.bt-media-layout.has-info.is-row.is-info-clipped > .bt-media-info {
+    display: none;
+}
+
+/* Stacked, the info has a share of the pane's height (media_layout.js `setInfoShare`) and the picture the rest, whatever its shape. */
+.bt-media-layout.has-info.has-info-share:not(.is-row) > .bt-media {
+    width: 100%;
+    aspect-ratio: auto;
+    flex: 0 0 calc((1 - var(--bt-media-info-share, 0.2)) * 100%);
+}
+
+/* Halves (media_layout.js `setHalves`): the info is a second picture; two equal boxes, stacked, whatever the pane's shape. Each holds its picture
+   as the pane would (a video view fills its box and fits itself). */
+.bt-media-layout.has-info.has-halves > .bt-media {
+    width: 100%;
+    aspect-ratio: auto;
+    align-self: stretch;
+    flex: 1 1 0;
+}
+
+.bt-media-layout.has-info.has-halves > .bt-media-info,
+.bt-media-layout.has-info.has-halves > .bt-media-info:has(.bt-live-chat) {
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+    background: #000;
+    flex: 1 1 0;
+}
+
+/* Fullscreen: the picture alone, over the whole pane. */
+.bt-media-stage.is-fullscreen .bt-media-layout.has-info > .bt-media {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    flex: 1 1 auto;
+}
+
+.bt-media-stage.is-fullscreen .bt-media-layout.has-info > .bt-media-info {
+    display: none;
+}

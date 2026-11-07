@@ -1,0 +1,9 @@
+<svg color="#fff" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <!-- Pair of glasses: two lenses, the bridge between them, a temple on each side. -->
+  <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="6.5" cy="14" r="3.8"/>
+    <circle cx="17.5" cy="14" r="3.8"/>
+    <path d="M10.3 13.2c1-.8 2.4-.8 3.4 0"/>
+    <path d="M2.7 13.6L3.6 7.5M21.3 13.6l-.9-6.1"/>
+  </g>
+</svg>

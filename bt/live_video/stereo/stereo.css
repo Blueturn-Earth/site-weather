@@ -1,0 +1,167 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font: 13px / 1.35 system-ui, sans-serif;
+  background: #000;
+  color: #d8dde6;
+}
+
+/* The two eyes, side by side. Swapping them (cross-eyed view) is only their order: the players are never moved in the page, which would reload them. */
+#stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  background: #000;
+}
+
+/* The two halves fill the page; the player's frame in each is placed and scaled by the page (stereo_page.js). */
+.eye {
+  position: relative;
+  flex: 0 0 50%;
+  overflow: hidden;
+  background: #000;
+}
+
+#eyeA {
+  order: 0;
+}
+
+#eyeB {
+  order: 1;
+}
+
+#stage.is-crossed #eyeA {
+  order: 2;
+}
+
+/* Over the eyes, to tap them (play / pause). */
+#tap {
+  position: fixed;
+  inset: 0;
+  touch-action: manipulation;
+}
+
+#notice {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(90vw, 560px);
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(10, 14, 20, 0.85);
+  text-align: center;
+  pointer-events: none;
+}
+
+#notice[hidden] {
+  display: none;
+}
+
+/* The controls, over the bottom of the eyes: they fade out while it plays and nobody touches the screen. */
+#bar {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  width: min(96vw, 860px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(10, 14, 20, 0.7);
+  backdrop-filter: blur(4px);
+  transition: opacity 0.5s ease;
+}
+
+body.idle #bar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#bar .bt-split-btn {
+  --bt-split-btn-size: 40px;
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+
+#scrub {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#clock {
+  flex: 0 0 auto;
+  font: 12px / 1.2 ui-monospace, Consolas, monospace;
+}
+
+.slider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.slider input {
+  width: clamp(80px, 18vw, 180px);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+#overlap {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+#overlap.is-none {
+  color: #ffb74d;
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  #overlap {
+    order: 5;
+  }
+}
+
+/* The page loads two players and puts them where they were sent: nothing is shown of them until they are there. */
+#cover {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  background: #000;
+  color: #d8dde6;
+  font-size: 15px;
+}
+
+#cover[hidden] {
+  display: none;
+}

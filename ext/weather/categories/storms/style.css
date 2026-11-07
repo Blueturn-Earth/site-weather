@@ -1,0 +1,48 @@
+.hurricane-track-label {
+  font: 700 13px/1.25 system-ui, sans-serif;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.hurricane-track-label-hit {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.hurricane-track-hitbox {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.hurricane-track-label.is-selected-label {
+  /* Clickable so dismissing the fiche can be undone via the name label. */
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.hurricane-track-seg-hit {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.hurricane-track-seg {
+  pointer-events: none;
+  cursor: pointer;
+}
+
+.hurricane-track-point-label {
+  font: 700 13px/1.25 system-ui, sans-serif;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.hurricane-track-point-label-hit {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+#weatherSvg .hurricane-track-seg-hit.is-past-archive,
+#weatherSvg .hurricane-track-point-label.is-past-archive,
+#weatherSvg .hurricane-track-point-label-hit.is-past-archive {
+  cursor: default;
+}

@@ -1,0 +1,436 @@
+/*
+ * Split view (split_view.js) and the floating window (floating_window.js). The buttons over a pane's corner (split_controls.js) are in
+ * `split_controls.css` and the picture with its info (media_layout.js) in `media_layout.css`: a page that has no split pane (the live
+ * video demo) links those alone.
+ *
+ * Standalone: with an Earth stand-in `#topGL` (fixed, full screen) and the two files above, this is all `bt/split/demo/` needs. The rules for the
+ * app's own chrome (`#appMenu`, `.opposite-top-chrome`, `#topUI`) match nothing without it. The timeline's
+ * (`bt/timeline/timeline.css`) and the captions' (`bt/style.css`) follow the split in their files.
+ *
+ * Classes the split puts on <body>: `bt-split-row` (landscape, side by side) / `bt-split-col` (portrait, stacked),
+ * `bt-split-flip` (landscape: the pane on the left), `bt-split-top` (portrait: the pane at the top), `bt-split-at-menu`,
+ * `bt-split-edge`, `bt-split-earth-hidden`, `bt-split-line-end`, `bt-split-pane-fullscreen`; variables `--bt-split` (the
+ * pane's share now), `--bt-split-size`, `--bt-split-start`, `--bt-split-end`.
+ */
+
+/*
+ * Split view (split_view.js): Earth keeps one half, #btSplitPane the other.
+ * Cut along the long side: row = landscape (Earth left), col = portrait (Earth top).
+ */
+body.bt-split-row #topGL {
+    width: calc((1 - var(--bt-split, 0)) * 100%);
+    right: auto;
+}
+
+/* Divider at the Earth's edge (split_view.js): nothing of the globe shows, and
+   its render loop is stopped (gl.js). */
+body.bt-split-earth-hidden #topGL {
+    visibility: hidden;
+}
+
+body.bt-split-col #topGL {
+    height: calc((1 - var(--bt-split, 0)) * 100%);
+    bottom: auto;
+}
+
+/* Pane keeps its open size and slides in from the right / bottom edge. */
+#btSplitPane {
+    position: fixed;
+    z-index: 15;
+    overflow: hidden;
+    background: #000;
+    pointer-events: auto;
+}
+
+#btSplitPane[hidden] {
+    display: none;
+}
+
+body.bt-split-row #btSplitPane {
+    top: 0;
+    bottom: 0;
+    width: calc(var(--bt-split-size, 0.5) * 100%);
+    left: calc((1 - var(--bt-split, 0)) * 100%);
+}
+
+body.bt-split-col #btSplitPane {
+    left: 0;
+    right: 0;
+    height: calc(var(--bt-split-size, 0.5) * 100%);
+    top: calc((1 - var(--bt-split, 0)) * 100%);
+}
+
+.bt-split-pane-body {
+    position: absolute;
+    inset: 0;
+}
+
+body.bt-split-pane-fullscreen #topUI {
+    display: none;
+}
+
+/* Floating window (floating_window.js): the video stage with its info panel under it, over the globe and just above the
+   chrome (#topUI, z 20: its captions would take the presses on the window's strip), dragged by the strip, resized by
+   the corner. It does not fade on idle: a video playing in it stays. */
+.bt-floating-window {
+    position: fixed;
+    z-index: 21;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.18);
+    pointer-events: auto;
+    /* Smaller buttons than a half screen's. */
+    --bt-split-btn-size: 32px;
+}
+
+.bt-floating-handle {
+    flex: 0 0 auto;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    cursor: grab;
+    touch-action: none;
+}
+
+.bt-floating-handle::before {
+    content: '';
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.45);
+}
+
+.bt-floating-window.is-dragging .bt-floating-handle {
+    cursor: grabbing;
+}
+
+/* The window's own ×, over the right end of the strip (floating_window.js): always there, never faded with the chrome. */
+.bt-floating-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 22px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0 10px 0 6px;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    cursor: pointer;
+}
+
+.bt-floating-close svg {
+    width: 14px;
+    height: 14px;
+}
+
+.bt-floating-close:hover,
+.bt-floating-close:focus-visible {
+    background: rgba(0, 0, 0, 0.8);
+    outline: none;
+}
+
+.bt-floating-stage {
+    position: relative;
+    flex: 0 0 auto;
+    width: 100%;
+    aspect-ratio: var(--bt-floating-aspect, 16 / 9);
+    overflow: hidden;
+    background: #000;
+}
+
+/* The info panel of the content (what the split pane shows beside the video). */
+.bt-floating-info {
+    flex: 0 0 auto;
+    padding: 6px 10px 8px;
+    color: #fff;
+    font: 13px / 1.3 system-ui, sans-serif;
+    text-align: center;
+}
+
+.bt-floating-info:empty {
+    display: none;
+}
+
+.bt-floating-resize {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    width: 22px;
+    height: 22px;
+    cursor: nwse-resize;
+    touch-action: none;
+    background: linear-gradient(135deg, transparent 55%, rgba(255, 255, 255, 0.6) 55%, rgba(255, 255, 255, 0.6) 65%, transparent 65%, transparent 75%, rgba(255, 255, 255, 0.6) 75%, rgba(255, 255, 255, 0.6) 85%, transparent 85%);
+}
+
+/* Body level (split_view.js), tracking the pane's corner: above chrome over the pane. */
+.bt-split-pane-close {
+    position: fixed;
+    z-index: 23;
+    top: 8px;
+    right: 8px;
+    left: auto;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 24px;
+    line-height: 36px;
+    cursor: pointer;
+}
+
+/* Top-right corner of the pane (36px button + 8px margin from its edge). */
+body.bt-split-row .bt-split-pane-close {
+    top: 8px;
+    right: auto;
+    left: calc((1 - var(--bt-split, 0) + var(--bt-split-size, 0.5)) * 100% - 44px);
+}
+
+body.bt-split-col .bt-split-pane-close {
+    right: 8px;
+    left: auto;
+    top: calc((1 - var(--bt-split, 0)) * 100% + 8px);
+}
+
+/* Phone landscape with nav buttons on the left (split_view.js): mirrored,
+   pane slides in from the left edge, Earth on the right. */
+/* A pane on the menu's side (split_view.js `paneAtMenu`, the ISS video): the menu column, with what hangs under it, moves in
+   to the split line: all the chrome stays on the Earth half, the pane has only its own content. */
+body.bt-split-row.bt-split-at-menu #appMenu.menu-corner-right {
+    right: calc(var(--bt-split, 0) * 100%);
+}
+
+body.bt-split-row.bt-split-at-menu #appMenu.menu-corner-left {
+    left: calc(var(--bt-split, 0) * 100%);
+}
+
+/* Portrait with the pane at the top (split_view.js `setSplitPaneTop`): the Earth is the lower half, and the pane
+   slides in from the top edge. */
+body.bt-split-col.bt-split-top #topGL {
+    top: calc(var(--bt-split, 0) * 100%);
+    bottom: 0;
+}
+
+body.bt-split-col.bt-split-top #btSplitPane {
+    top: calc((var(--bt-split, 0) - var(--bt-split-size, 0.5)) * 100%);
+}
+
+body.bt-split-col.bt-split-top .bt-split-pane-close {
+    top: calc((var(--bt-split, 0) - var(--bt-split-size, 0.5)) * 100% + 8px);
+}
+
+/* The menu column hangs from the top of the Earth half, not of the screen. */
+body.bt-split-col.bt-split-top #appMenu {
+    top: calc(var(--bt-split-start, 0) * 100%);
+}
+
+body.bt-split-col.bt-split-top .opposite-top-chrome {
+    top: calc(var(--bt-split-start, 0) * 100% + 6px + var(--opposite-top-shift, 0px));
+}
+
+/* The hit area lies inside the pane (ends 1px after the line), as in the flipped row. */
+body.bt-split-col.bt-split-top .bt-split-divider {
+    top: clamp(0px, calc(var(--bt-split, 0) * 100% + 1px - var(--bt-split-hit, 24px)), calc(100% - var(--bt-split-hit, 24px)));
+}
+
+body.bt-split-row.bt-split-flip #topGL {
+    left: calc(var(--bt-split, 0) * 100%);
+}
+
+body.bt-split-row.bt-split-flip #btSplitPane {
+    left: calc((var(--bt-split, 0) - var(--bt-split-size, 0.5)) * 100%);
+}
+
+body.bt-split-row.bt-split-flip .bt-split-pane-close {
+    left: calc(var(--bt-split, 0) * 100% - 44px);
+}
+
+/* Draggable divider (split_view.js): thin line, grip pill, and a hit area that
+   lies wholly inside the content pane: the timeline sits right against the
+   boundary on the Earth side, and the divider must not cover its track.
+   Parked at an edge (body.bt-split-edge) the line is at the screen's edge and
+   the hit area is the first 3% of the screen (EDGE_ZONE), on the visible side:
+   the box is clamped into the screen, and the line moves to its outer end
+   (body.bt-split-line-end: pane side is the box's end, or the pane is hidden). */
+.bt-split-divider {
+    position: fixed;
+    z-index: 22;
+    touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* The strip lies along the whole line, over whatever is at the pane's edge (its buttons): only the grip in its middle,
+       the bold part of the line, takes presses (below). */
+    pointer-events: none;
+}
+
+.bt-split-divider[hidden] {
+    display: none;
+}
+
+/* Menus and their popups (help, settings, …) lie above the line. They sit in
+   #topUI's stacking context (20), so the line goes just beneath it while one
+   is open, and when parked at the Earth's edge: that is the menu's side, whose
+   controls then win the overlap (the rest of #topUI lets clicks through). Parked at
+   the pane's edge it stays above #topUI: the timeline lies against that edge
+   and must not hide the grab strip. */
+body.bt-split-earth-hidden .bt-split-divider,
+body:has(#appMenu .menu-panel:not([hidden]),
+         #appMenu .menu-submenu:not([hidden]),
+         #extQuickSwitch:not([hidden]),
+         .settings-panel:not([hidden]),
+         .about-panel:not([hidden])) .bt-split-divider {
+    z-index: 19;
+}
+
+body:has(.settings-panel:not([hidden]), .about-panel:not([hidden])) .bt-split-pane-close {
+    z-index: 19;
+}
+
+body.bt-split-edge {
+    --bt-split-hit: max(24px, 3%);
+}
+
+.bt-split-divider::before {
+    content: '';
+    position: absolute;
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.bt-split-divider-grip {
+    position: relative;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+    transition: background 0.15s;
+    /* The only part of the divider that takes presses. */
+    pointer-events: auto;
+}
+
+/* A grip is thin: its grab area reaches a finger's breadth around it (a pseudo-element is part of its element). */
+.bt-split-divider-grip::after {
+    content: '';
+    position: absolute;
+    inset: -10px;
+}
+
+.bt-split-divider-grip:hover,
+.bt-split-divider--active .bt-split-divider-grip {
+    background: #fff;
+}
+
+/* Landscape. The box starts 1px before the line on the Earth side (pane on the
+   right), or ends 1px after it (flipped); clamped into the screen. */
+body.bt-split-row .bt-split-divider {
+    top: 0;
+    bottom: 0;
+    width: var(--bt-split-hit, 24px);
+    left: clamp(0px, calc((1 - var(--bt-split, 0)) * 100% - 1px), calc(100% - var(--bt-split-hit, 24px)));
+}
+
+body.bt-split-row.bt-split-flip .bt-split-divider {
+    left: clamp(0px, calc(var(--bt-split, 0) * 100% + 1px - var(--bt-split-hit, 24px)), calc(100% - var(--bt-split-hit, 24px)));
+}
+
+body.bt-split-row .bt-split-divider::before {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 2px;
+}
+
+body.bt-split-row.bt-split-line-end .bt-split-divider::before {
+    left: auto;
+    right: 0;
+}
+
+/* The hit area lies inside the pane, so the grip is placed on the line itself
+   (its center on the 2px line), half of it outside the box; at an edge it is
+   wholly inside the screen. */
+body.bt-split-row .bt-split-divider-grip {
+    position: absolute;
+    top: 50%;
+    left: 1px;
+    width: 6px;
+    height: 48px;
+    transform: translate(-50%, -50%);
+    cursor: col-resize;
+}
+
+body.bt-split-row.bt-split-line-end .bt-split-divider-grip {
+    left: auto;
+    right: 1px;
+    transform: translate(50%, -50%);
+}
+
+body.bt-split-row.bt-split-edge .bt-split-divider-grip {
+    left: 3px;
+    transform: translate(0, -50%);
+}
+
+body.bt-split-row.bt-split-edge.bt-split-line-end .bt-split-divider-grip {
+    left: auto;
+    right: 3px;
+}
+
+/* Portrait: the pane is at the bottom. */
+body.bt-split-col .bt-split-divider {
+    left: 0;
+    right: 0;
+    height: var(--bt-split-hit, 24px);
+    top: clamp(0px, calc((1 - var(--bt-split, 0)) * 100% - 1px), calc(100% - var(--bt-split-hit, 24px)));
+}
+
+body.bt-split-col .bt-split-divider::before {
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+}
+
+body.bt-split-col.bt-split-line-end .bt-split-divider::before {
+    top: auto;
+    bottom: 0;
+}
+
+body.bt-split-col .bt-split-divider-grip {
+    position: absolute;
+    left: 50%;
+    top: 1px;
+    width: 48px;
+    height: 6px;
+    transform: translate(-50%, -50%);
+    cursor: row-resize;
+}
+
+body.bt-split-col.bt-split-line-end .bt-split-divider-grip {
+    top: auto;
+    bottom: 1px;
+    transform: translate(-50%, 50%);
+}
+
+body.bt-split-col.bt-split-edge .bt-split-divider-grip {
+    top: 3px;
+    transform: translate(-50%, 0);
+}
+
+body.bt-split-col.bt-split-edge.bt-split-line-end .bt-split-divider-grip {
+    top: auto;
+    bottom: 3px;
+}
+
+.bt-split-pane-close[hidden] {
+    display: none;
+}
